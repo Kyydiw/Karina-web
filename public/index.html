@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Karina-MD Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ==================== NAVIGATION ==================== -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <div class="nav-left">
+      <button class="nav-profile-btn" aria-label="Profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </button>
+      <button class="nav-add-btn" aria-label="Add new">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="nav-center">
+      <a href="#" class="nav-link">Home</a>
+      <a href="#" class="nav-link active">Search</a>
+      <a href="#" class="nav-link">Message</a>
+    </div>
+    <div class="nav-right">
+      <button class="nav-mobile-toggle" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <span class="nav-user-badge" id="navUserBadge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span id="navUsername"></span>
+      </span>
+      <a href="#" class="btn-login" id="btnLogin">Log in</a>
+      <a href="#admin" class="btn-signup" id="btnAdmin" style="display:none;">Admin Panel</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ==================== LOGIN MODAL ==================== -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal-box">
+    <button class="modal-close-btn" id="modalCloseBtn" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <h2 class="modal-title">Welcome Back</h2>
+    <p class="modal-subtitle">Sign in to access the admin dashboard.</p>
+    <form id="loginForm" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="loginUsername">Username</label>
+        <input class="form-input" type="text" id="loginUsername" placeholder="Enter your username" autocomplete="username" required>
+        <div class="form-error" id="loginError"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="loginPassword">Password</label>
+        <input class="form-input" type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-submit" id="loginSubmitBtn">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== HERO BANNER ==================== -->
+<section class="hero">
+  <div class="hero-container">
+    <div class="hero-particles" id="heroParticles"></div>
+    <div class="hero-content">
+      <div class="hero-label reveal-up">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        WhatsApp Bot
+      </div>
+      <h1 class="hero-title reveal-up">
+        Hello, I'm <span>Karina</span>
+      </h1>
+      <p class="hero-subtitle reveal-up">
+        Your premium multi-device WhatsApp bot powered by cutting-edge automation.
+        Experience seamless AI-driven features tailored for everyday convenience and creativity.
+      </p>
+      <a href="#" class="hero-read-more reveal-up">
+        Read More
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </a>
+      <div class="hero-slider-dots reveal-up">
+        <div class="slider-dot active"></div>
+        <div class="slider-dot"></div>
+        <div class="slider-dot"></div>
+      </div>
+    </div>
+    <div class="hero-image-area">
+      <div class="hero-image-wrapper">
+        <div class="floating-shapes" id="floatingShapes">
+          <div class="float-shape heart" data-speed="2.5">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--accent-teal)" opacity="0.5">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </div>
+          <div class="float-shape circle" data-speed="1.8">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--accent-teal-dark)" opacity="0.35">
+              <circle cx="12" cy="12" r="10"/>
+            </svg>
+          </div>
+          <div class="float-shape diamond" data-speed="3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--accent-teal-light)" opacity="0.4">
+              <rect x="3" y="3" width="18" height="18" rx="2" transform="rotate(45 12 12)"/>
+            </svg>
+          </div>
+          <div class="float-shape star" data-speed="2.2">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--accent-teal)" opacity="0.4">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+        </div>
+        <div class="hero-image-placeholder reveal-scale">
+          <div class="silhouette">
+            <img src="https://files.catbox.moe/0wvhtu.jpg" alt="Karina aespa Hero">
+          </div>
+          <div class="name-tag">Karina Aespa</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== GRID SECTION ==================== -->
+<section class="grid-section">
+  <div class="grid-container">
+
+    <!-- COLUMN 1: Artwork -->
+    <div class="card artwork-col reveal-up">
+      <div class="col-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+        </svg>
+        Artwork &gt;
+      </div>
+      <div class="artwork-card tilt-card">
+        <div class="artwork-img">
+          <img src="https://files.catbox.moe/j7708c.jpg" alt="Karina aespa Artwork 1" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <div class="watermark">by @senzxc</div>
+      </div>
+      <div class="artwork-card tilt-card">
+        <div class="artwork-img">
+          <img src="https://files.catbox.moe/8rhqoj.jpg" alt="Karina aespa Artwork 2" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <div class="watermark">by @senzxc</div>
+      </div>
+      <button class="btn-view-more">
+        View More
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- COLUMN 2: Recent Search & Widgets -->
+    <div class="card search-col reveal-up">
+      <div class="col-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Recent Search
+      </div>
+      <div class="search-list">
+        <div class="search-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Karina aespa vocal
+        </div>
+        <div class="search-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          karina-md features
+        </div>
+        <div class="search-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          WhatsApp bot setup guide
+        </div>
+        <div class="search-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          aespa comeback 2026
+        </div>
+      </div>
+      <div class="widget-row">
+        <div class="widget-card tilt-card">
+          <button class="widget-close" aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <div class="widget-img">
+            <img src="https://files.catbox.moe/3638b8.jpg" alt="Karina aespa Widget 1" style="width: 100%; height: 100%; object-fit: cover;">
+          </div>
+        </div>
+        <div class="widget-card tilt-card">
+          <button class="widget-close" aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <div class="widget-img">
+            <img src="https://files.catbox.moe/jlqr9q.jpg" alt="Karina aespa Widget 2" style="width: 100%; height: 100%; object-fit: cover;">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMN 3: Features / Dynamic Updates -->
+    <div class="card features-col reveal-up">
+      <div class="col-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        Latest Updates
+      </div>
+      <div class="feature-list" id="featureList">
+        <!-- Static fallback features (overridden by API data when available) -->
+        <div class="feature-card tilt-card">
+          <div class="feature-badge">01</div>
+          <div class="feature-text">
+            <h4>The Number</h4>
+            <p>Seamless multi-device connectivity with instant sync across all your linked devices.</p>
+          </div>
+        </div>
+        <div class="feature-card tilt-card">
+          <div class="feature-badge">02</div>
+          <div class="feature-text">
+            <h4>The Bot</h4>
+            <p>AI-powered automation for media downloads, group management, and smart replies.</p>
+          </div>
+        </div>
+        <div class="feature-card tilt-card">
+          <div class="feature-badge">03</div>
+          <div class="feature-text">
+            <h4>The System</h4>
+            <p>Enterprise-grade stability with 99.9% uptime, anti-crash, and auto-recovery.</p>
+          </div>
+        </div>
+        <div class="feature-card tilt-card">
+          <div class="feature-badge">04</div>
+          <div class="feature-text">
+            <h4>The Experience</h4>
+            <p>Premium UI interactions, smooth animations, and intuitive command interface.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== ADMIN PANEL (hidden by default) ==================== -->
+<section class="admin-panel" id="adminPanel">
+  <div class="admin-container">
+    <div class="admin-header">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        Admin Dashboard
+      </h2>
+      <button class="btn-logout" id="btnLogout">Log Out</button>
+    </div>
+
+    <!-- Upload Form -->
+    <div class="admin-upload-section">
+      <h3>Create New Update</h3>
+      <form id="uploadForm" novalidate>
+        <div class="admin-form-row">
+          <div class="form-group">
+            <label class="form-label" for="updateTitle">Title</label>
+            <input class="form-input" type="text" id="updateTitle" placeholder="e.g. New Command Added" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="updateVersion">Version</label>
+            <input class="form-input" type="text" id="updateVersion" placeholder="e.g. v2.5.0" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="updateDesc">Description</label>
+          <textarea class="form-textarea" id="updateDesc" placeholder="Describe what's new in this update..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="updateLink">Changelog Link (optional)</label>
+          <input class="form-input" type="url" id="updateLink" placeholder="https://...">
+        </div>
+        <button type="submit" class="btn-submit" id="uploadSubmitBtn">Publish Update</button>
+        <div class="upload-status" id="uploadStatus"></div>
+      </form>
+    </div>
+
+    <!-- Recent Updates List -->
+    <div class="admin-updates-section">
+      <h3>Recent Updates</h3>
+      <div id="adminUpdatesList">
+        <div class="admin-empty-state">Loading updates...</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="footer-section">
+  <div class="dev-credit reveal-up">
+    Developed by <span>kyyinfinite</span>
+  </div>
+  <div class="cta-panel reveal-up">
+    <a href="https://whatsapp.com/channel/0029Vb816qs6LwHheK1KT044" target="_blank" rel="noopener" class="cta-btn cta-btn-whatsapp">
+      <svg viewBox="0 0 24 24" fill="#fff">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+      Join WhatsApp Channel
+    </a>
+    <a href="https://wa.me/6283815201912" target="_blank" rel="noopener" class="cta-btn cta-btn-contact">
+      <svg viewBox="0 0 24 24" fill="var(--accent-teal-dark)">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+      Contact on WhatsApp
+    </a>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

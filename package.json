@@ -1,0 +1,21 @@
+{
+  "name": "karina-md-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Karina-MD WhatsApp Bot Dashboard - Production modular web application",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5"
+  },
+  "devDependencies": {
+    "vercel": "^39.4.0"
+  }
+}

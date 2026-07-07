@@ -663,3 +663,146 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 }
 .nav-user-badge.visible { display: inline-flex; }
 .nav-user-badge svg { width: 14px; height: 14px; }
+/* ============================================================ */
+/*  PLATFORM v2 — Brand, Footer, Mobile Nav additions           */
+/* ============================================================ */
+
+/* Brand mark in navbar */
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--text-charcoal);
+  letter-spacing: -0.02em;
+}
+.nav-brand .brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent-teal), var(--accent-teal-dark));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px var(--accent-teal-glow);
+  transition: transform 0.3s ease;
+}
+.nav-brand:hover .brand-mark {
+  transform: scale(1.08) rotate(-5deg);
+}
+.nav-brand .brand-name span {
+  color: var(--accent-teal-dark);
+  font-weight: 500;
+}
+
+/* Site footer */
+.site-footer {
+  background: linear-gradient(180deg, var(--bg-white) 0%, var(--bg-neutral) 100%);
+  border-top: 1px solid var(--border-soft);
+  padding: 64px 0 32px;
+  margin-top: 80px;
+}
+.footer-top {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 60px;
+  margin-bottom: 40px;
+}
+.footer-brand .footer-logo {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-charcoal);
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+.footer-tagline {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 320px;
+}
+.footer-links {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+}
+.footer-col h5 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-charcoal);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+}
+.footer-col a {
+  display: block;
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 4px 0;
+  transition: color 0.2s ease, padding-left 0.2s ease;
+}
+.footer-col a:hover {
+  color: var(--accent-teal-dark);
+  padding-left: 4px;
+}
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.footer-copy {
+  font-size: 12px;
+  color: var(--text-light);
+}
+.site-footer .dev-credit {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.site-footer .dev-credit span {
+  color: var(--accent-teal-dark);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .footer-top { grid-template-columns: 1fr; gap: 32px; }
+  .footer-links { grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .nav-brand .brand-name { display: none; }
+}
+@media (max-width: 540px) {
+  .footer-links { grid-template-columns: 1fr 1fr; }
+}
+
+/* Override old footer styles — keep old footer (legacy home page) styling intact,
+   but the new shared footer is added separately via shared.js */
+.footer-section.site-footer .cta-panel {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Hide the old footer cta-panel on pages that use shared footer */
+.site-footer .dev-credit + .footer-copy { display: block; }
+
+/* Navbar responsive: hide center links on mobile, show drawer toggle */
+@media (max-width: 880px) {
+  .nav-center { display: none; }
+  .nav-mobile-toggle { display: inline-flex; }
+  .nav-user-badge { display: none !important; }
+  .nav-user-badge.visible { display: none !important; }
+}
+@media (min-width: 881px) {
+  .nav-mobile-toggle { display: none; }
+}
+
+/* Old navbar additions hidden on home page if needed */
+.nav-profile-btn, .nav-add-btn { display: none; }

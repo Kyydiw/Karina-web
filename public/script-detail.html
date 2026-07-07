@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Script Detail — Karina-MD Platform</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+
+<section class="page-hero" style="padding-bottom: 24px;">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="sep">/</span>
+      <a href="/scripts">Scripts</a><span class="sep">/</span>
+      <span id="bcTitle">Loading…</span>
+    </div>
+  </div>
+</section>
+
+<section class="section-sm" style="padding-top: 24px;">
+  <div class="container">
+    <div id="detailContainer">
+      <div class="skeleton-card" style="height: 300px;"></div>
+    </div>
+  </div>
+</section>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var K = window.Karina;
+  var path = window.location.pathname;
+  var idOrSlug = path.replace(/^\/scripts\//, '').replace(/\/$/, '');
+  if (!idOrSlug) {
+    window.location.href = '/scripts';
+    return;
+  }
+
+  function load() {
+    K.api('/scripts/' + encodeURIComponent(idOrSlug)).then(function (json) {
+      if (!json.success) throw new Error('Not found');
+      var s = json.data;
+      document.title = s.title + ' — Karina-MD Platform';
+      document.getElementById('bcTitle').textContent = s.title;
+
+      var tags = (s.tags || []).map(function (t) {
+        return '<span class="card-tag">' + K.util.escapeHTML(t) + '</span>';
+      }).join('');
+
+      var html = '<div class="detail-header fade-in">' +
+        '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 16px;">' +
+          '<span class="card-category">' + K.util.escapeHTML(s.category) + '</span>' +
+          '<span class="card-version">v' + K.util.escapeHTML(s.version) + '</span>' +
+          (s.isFeatured ? '<span class="badge badge-featured">Featured</span>' : '') +
+        '</div>' +
+        '<h1>' + K.util.escapeHTML(s.title) + '</h1>' +
+        '<p style="font-size: 17px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">' + K.util.escapeHTML(s.description) + '</p>' +
+        '<div class="detail-meta">' +
+          '<span class="detail-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' + K.util.formatNumber(s.downloadCount || 0) + ' downloads</span>' +
+          '<span class="detail-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' + K.util.formatNumber(s.viewCount || 0) + ' views</span>' +
+          '<span class="detail-meta-item">📦 ' + K.util.formatBytes(s.fileSize || 0) + '</span>' +
+          '<span class="detail-meta-item">📄 ' + K.util.escapeHTML(s.fileName) + '</span>' +
+          '<span class="detail-meta-item">🕒 ' + K.util.formatRelative(s.createdAt) + '</span>' +
+        '</div>' +
+        (tags ? '<div class="card-tags" style="margin-top: 16px;">' + tags + '</div>' : '') +
+      '</div>' +
+      '<div class="detail-body">' +
+        '<div class="detail-main fade-in">' +
+          (s.longDescription ?
+            '<h3 style="font-size: 20px; font-weight: 700; color: var(--text-charcoal); margin-bottom: 16px;">About this script</h3>' +
+            '<div style="font-size: 15px; color: var(--text-charcoal); line-height: 1.75; white-space: pre-wrap; margin-bottom: 32px;">' + K.util.escapeHTML(s.longDescription) + '</div>'
+            : ''
+          ) +
+          (s.changelog ?
+            '<h3 style="font-size: 20px; font-weight: 700; color: var(--text-charcoal); margin-bottom: 16px; padding-top: 24px; border-top: 1px solid var(--border-soft);">Changelog</h3>' +
+            '<pre style="background: var(--bg-neutral); padding: 16px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; font-family: monospace;">' + K.util.escapeHTML(s.changelog) + '</pre>'
+            : ''
+          ) +
+          '<div style="margin-top: 32px; padding: 20px; background: var(--bg-neutral); border-radius: var(--radius-md); border-left: 3px solid var(--accent-teal);">' +
+            '<h4 style="font-size: 14px; font-weight: 600; color: var(--text-charcoal); margin-bottom: 8px;">How to use</h4>' +
+            '<ol style="font-size: 14px; color: var(--text-muted); padding-left: 20px; line-height: 1.7;">' +
+              '<li>Click the Download button on the right to get the script file.</li>' +
+              '<li>Save the file to your Karina-MD bot directory.</li>' +
+              '<li>Install any required dependencies listed in the script header.</li>' +
+              '<li>Restart your bot to load the new script.</li>' +
+              '<li>Open a support ticket if you encounter any issues.</li>' +
+            '</ol>' +
+          '</div>' +
+        '</div>' +
+        '<aside class="detail-sidebar">' +
+          '<div class="sidebar-card">' +
+            '<h4>Download</h4>' +
+            '<a href="/api/scripts/' + (s.slug || s._id) + '/download" class="btn btn-primary btn-block" style="margin-bottom: 12px;">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+              'Download Script' +
+            '</a>' +
+            (s.externalUrl ?
+              '<a href="' + K.util.escapeHTML(s.externalUrl) + '" target="_blank" rel="noopener" class="btn btn-outline btn-block" style="margin-bottom: 12px;">External Link ↗</a>' : '') +
+            '<a href="/support" class="btn btn-secondary btn-block">Report Issue</a>' +
+          '</div>' +
+          '<div class="sidebar-card">' +
+            '<h4>File info</h4>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Filename</span><span class="sidebar-stat-value" style="font-size:12px; max-width: 160px; overflow:hidden; text-overflow:ellipsis;">' + K.util.escapeHTML(s.fileName) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">File size</span><span class="sidebar-stat-value">' + K.util.formatBytes(s.fileSize || 0) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Type</span><span class="sidebar-stat-value">' + K.util.escapeHTML(s.mimeType || 'text/javascript') + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Version</span><span class="sidebar-stat-value">' + K.util.escapeHTML(s.version) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Uploaded by</span><span class="sidebar-stat-value">' + K.util.escapeHTML(s.uploadedBy || 'admin') + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Published</span><span class="sidebar-stat-value">' + K.util.formatDate(s.createdAt) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Updated</span><span class="sidebar-stat-value">' + K.util.formatDate(s.updatedAt) + '</span></div>' +
+          '</div>' +
+          (s.changelogLink ?
+            '<div class="sidebar-card">' +
+              '<h4>External</h4>' +
+              '<a href="' + K.util.escapeHTML(s.changelogLink) + '" target="_blank" rel="noopener" style="font-size: 14px; color: var(--accent-teal-dark); display: inline-flex; align-items: center; gap: 4px;">Full changelog <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9" transform="rotate(-90 12 12)"/></svg></a>' +
+            '</div>' : '') +
+        '</aside>' +
+      '</div>';
+
+      document.getElementById('detailContainer').innerHTML = html;
+      loadRelated(s);
+    }).catch(function (err) {
+      document.getElementById('detailContainer').innerHTML =
+        '<div class="empty-state">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+          '<h3>Script not found</h3>' +
+          '<p>This script may have been removed or never existed.</p>' +
+          '<a href="/scripts" class="btn btn-primary" style="margin-top: 16px;">← Back to scripts</a>' +
+        '</div>';
+    });
+  }
+
+  function loadRelated(current) {
+    K.api('/scripts/list?perPage=4&category=' + encodeURIComponent(current.category)).then(function (json) {
+      if (!json.success) return;
+      var related = (json.data.items || []).filter(function (s) { return s._id !== current._id && s.slug !== current.slug; }).slice(0, 3);
+      if (related.length === 0) return;
+      var html = '<section class="section-sm"><div class="container">' +
+        '<h2 class="section-title" style="font-size: 22px; margin-bottom: 20px;">Related scripts</h2>' +
+        '<div class="cards-grid">' +
+        related.map(function (s) {
+          return '<article class="script-card fade-in">' +
+            '<a class="card-link-overlay" href="/scripts/' + (s.slug || s._id) + '"></a>' +
+            '<div class="card-top"><span class="card-category">' + K.util.escapeHTML(s.category) + '</span><span class="card-version">' + K.util.escapeHTML(s.version) + '</span></div>' +
+            '<h3>' + K.util.escapeHTML(s.title) + '</h3>' +
+            '<p class="card-desc">' + K.util.escapeHTML(K.util.truncate(s.description, 120)) + '</p>' +
+            '<div class="card-meta"><span>⬇ ' + K.util.formatNumber(s.downloadCount || 0) + '</span><span>' + K.util.formatRelative(s.createdAt) + '</span></div>' +
+          '</article>';
+        }).join('') +
+        '</div></div></section>';
+      var div = document.createElement('div');
+      div.innerHTML = html;
+      document.getElementById('detailContainer').appendChild(div.firstChild);
+    }).catch(function () {});
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

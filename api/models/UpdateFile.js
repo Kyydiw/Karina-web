@@ -26,7 +26,30 @@ const updateFileSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: ''
-    }
+    },
+    category: {
+      type: String,
+      enum: ['feature', 'bugfix', 'release', 'announcement', 'security'],
+      default: 'feature',
+      index: true
+    },
+    isPinned: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    isPublished: {
+      type: Boolean,
+      default: true,
+      index: true
+    },
+    tags: [
+      {
+        type: String,
+        trim: true,
+        maxlength: 30
+      }
+    ]
   },
   {
     timestamps: true,
@@ -35,5 +58,6 @@ const updateFileSchema = new mongoose.Schema(
 );
 
 updateFileSchema.index({ createdAt: -1 });
+updateFileSchema.index({ isPinned: -1, createdAt: -1 });
 
 module.exports = mongoose.models.UpdateFile || mongoose.model('UpdateFile', updateFileSchema);

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scripts — Karina-MD Platform</title>
+<meta name="description" content="Browse all WhatsApp bot scripts available on Karina-MD. Filter by category, search by keyword, download instantly.">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+
+<!-- ==================== HERO ==================== -->
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="sep">/</span><span>Scripts</span>
+    </div>
+    <h1>Script Library</h1>
+    <p>Discover WhatsApp bot scripts, plugins, modules, utilities, and tutorials. Each script is downloadable with full source code and changelog.</p>
+  </div>
+</section>
+
+<!-- ==================== LISTING ==================== -->
+<section class="section-sm">
+  <div class="container">
+    <!-- Filters bar -->
+    <div class="filters-bar">
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" class="form-input" placeholder="Search scripts by title or description...">
+      </div>
+      <select id="categoryFilter" class="filter-select">
+        <option value="">All categories</option>
+        <option value="bot-script">Bot Script</option>
+        <option value="plugin">Plugin</option>
+        <option value="module">Module</option>
+        <option value="utility">Utility</option>
+        <option value="tutorial">Tutorial</option>
+        <option value="other">Other</option>
+      </select>
+      <select id="sortFilter" class="filter-select">
+        <option value="newest">Newest first</option>
+        <option value="popular">Most viewed</option>
+        <option value="downloads">Most downloaded</option>
+        <option value="featured">Featured only</option>
+      </select>
+    </div>
+
+    <!-- Category count chips -->
+    <div id="categoryChips" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 24px;"></div>
+
+    <!-- Cards grid -->
+    <div class="cards-grid" id="scriptsGrid">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination"></div>
+  </div>
+</section>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var K = window.Karina;
+  var state = { page: 1, perPage: 12, q: '', category: '', sort: 'newest', totalPages: 1, total: 0 };
+
+  function load() {
+    var grid = document.getElementById('scriptsGrid');
+    grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
+
+    var qs = '?page=' + state.page + '&perPage=' + state.perPage + '&sort=' + state.sort;
+    if (state.q) qs += '&q=' + encodeURIComponent(state.q);
+    if (state.category) qs += '&category=' + encodeURIComponent(state.category);
+
+    K.api('/scripts/list' + qs).then(function (json) {
+      if (!json.success) throw new Error('Failed');
+      state.total = json.data.total;
+      state.totalPages = json.data.totalPages;
+
+      if (json.data.items.length === 0) {
+        grid.innerHTML = emptyState('No scripts found', 'Try adjusting your search or filter, or check back later for new scripts.');
+      } else {
+        grid.innerHTML = json.data.items.map(scriptCardHTML).join('');
+      }
+      renderPagination();
+    }).catch(function () {
+      grid.innerHTML = emptyState('Failed to load', 'Please check your connection and try again.');
+    });
+  }
+
+  function loadCategoryCounts() {
+    K.api('/scripts/categories/counts').then(function (json) {
+      if (!json.success) return;
+      var counts = json.data;
+      var chips = [
+        { key: '', label: 'All' },
+        { key: 'bot-script', label: 'Bot Script' },
+        { key: 'plugin', label: 'Plugin' },
+        { key: 'module', label: 'Module' },
+        { key: 'utility', label: 'Utility' },
+        { key: 'tutorial', label: 'Tutorial' },
+        { key: 'other', label: 'Other' }
+      ];
+      var html = chips.map(function (c) {
+        var count = c.key === '' ? Object.keys(counts).reduce(function (a, k) { return a + (counts[k] || 0); }, 0) : (counts[c.key] || 0);
+        var active = state.category === c.key ? ' active' : '';
+        return '<button class="filter-select' + active + '" data-cat="' + c.key + '" style="cursor:pointer;">' + c.label + ' <span style="opacity:.6;font-size:11px;">(' + count + ')</span></button>';
+      }).join('');
+      document.getElementById('categoryChips').innerHTML = html;
+
+      Array.prototype.forEach.call(document.querySelectorAll('#categoryChips button'), function (btn) {
+        btn.addEventListener('click', function () {
+          state.category = btn.getAttribute('data-cat');
+          state.page = 1;
+          load();
+          loadCategoryCounts(); // refresh active state
+        });
+      });
+    }).catch(function () {});
+  }
+
+  function scriptCardHTML(s) {
+    var tags = (s.tags || []).slice(0, 3).map(function (t) {
+      return '<span class="card-tag">' + K.util.escapeHTML(t) + '</span>';
+    }).join('');
+    return '<article class="script-card fade-in">' +
+      '<a class="card-link-overlay" href="/scripts/' + (s.slug || s._id) + '" aria-label="' + K.util.escapeHTML(s.title) + '"></a>' +
+      '<div class="card-top">' +
+        '<span class="card-category">' + K.util.escapeHTML(s.category) + '</span>' +
+        (s.isFeatured ? '<span class="badge badge-featured">Featured</span>' : '') +
+        '<span class="card-version">' + K.util.escapeHTML(s.version) + '</span>' +
+      '</div>' +
+      '<h3>' + K.util.escapeHTML(s.title) + '</h3>' +
+      '<p class="card-desc">' + K.util.escapeHTML(K.util.truncate(s.description, 160)) + '</p>' +
+      (tags ? '<div class="card-tags">' + tags + '</div>' : '') +
+      '<div class="card-meta">' +
+        '<div class="card-meta-group">' +
+          '<span class="card-meta-item">⬇ ' + K.util.formatNumber(s.downloadCount || 0) + '</span>' +
+          '<span class="card-meta-item">👁 ' + K.util.formatNumber(s.viewCount || 0) + '</span>' +
+        '</div>' +
+        '<span class="card-meta-item">' + K.util.formatRelative(s.createdAt) + '</span>' +
+      '</div>' +
+    '</article>';
+  }
+
+  function renderPagination() {
+    var el = document.getElementById('pagination');
+    if (state.totalPages <= 1) {
+      el.innerHTML = '<span class="pagination-info">' + state.total + ' script' + (state.total === 1 ? '' : 's') + ' total</span>';
+      return;
+    }
+    var html = '';
+    html += '<button class="pagination-btn"' + (state.page === 1 ? ' disabled' : '') + ' data-page="' + (state.page - 1) + '">← Prev</button>';
+    var start = Math.max(1, state.page - 2);
+    var end = Math.min(state.totalPages, state.page + 2);
+    if (start > 1) {
+      html += '<button class="pagination-btn" data-page="1">1</button>';
+      if (start > 2) html += '<span class="pagination-info">…</span>';
+    }
+    for (var i = start; i <= end; i++) {
+      html += '<button class="pagination-btn' + (i === state.page ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>';
+    }
+    if (end < state.totalPages) {
+      if (end < state.totalPages - 1) html += '<span class="pagination-info">…</span>';
+      html += '<button class="pagination-btn" data-page="' + state.totalPages + '">' + state.totalPages + '</button>';
+    }
+    html += '<button class="pagination-btn"' + (state.page === state.totalPages ? ' disabled' : '') + ' data-page="' + (state.page + 1) + '">Next →</button>';
+    html += '<span class="pagination-info">Page ' + state.page + ' of ' + state.totalPages + '</span>';
+    el.innerHTML = html;
+
+    Array.prototype.forEach.call(el.querySelectorAll('.pagination-btn[data-page]'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        state.page = parseInt(btn.getAttribute('data-page'), 10);
+        load();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  function emptyState(title, msg) {
+    return '<div class="empty-state" style="grid-column: 1 / -1;">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      '<h3>' + K.util.escapeHTML(title) + '</h3><p>' + K.util.escapeHTML(msg) + '</p></div>';
+  }
+
+  // Bind filters
+  var searchTimer;
+  document.getElementById('searchInput').addEventListener('input', function (e) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      state.q = e.target.value.trim();
+      state.page = 1;
+      load();
+    }, 350);
+  });
+  document.getElementById('sortFilter').addEventListener('change', function (e) {
+    state.sort = e.target.value;
+    state.page = 1;
+    load();
+  });
+  document.getElementById('categoryFilter').addEventListener('change', function (e) {
+    state.category = e.target.value;
+    state.page = 1;
+    load();
+    loadCategoryCounts();
+  });
+
+  // Initial load
+  load();
+  loadCategoryCounts();
+})();
+</script>
+</body>
+</html>

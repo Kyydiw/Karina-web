@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Updates — Karina-MD Platform</title>
+<meta name="description" content="All platform updates, changelogs, and announcements in one place.">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="sep">/</span><span>Updates</span>
+    </div>
+    <h1>Platform Updates</h1>
+    <p>Stay current with all the latest features, bug fixes, releases, and announcements from the Karina-MD platform.</p>
+  </div>
+</section>
+
+<section class="section-sm">
+  <div class="container">
+    <div class="filters-bar">
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" class="form-input" placeholder="Search updates...">
+      </div>
+      <select id="categoryFilter" class="filter-select">
+        <option value="">All categories</option>
+        <option value="feature">Feature</option>
+        <option value="bugfix">Bug Fix</option>
+        <option value="release">Release</option>
+        <option value="announcement">Announcement</option>
+        <option value="security">Security</option>
+      </select>
+    </div>
+
+    <div class="cards-grid" id="updatesGrid">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+</section>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var K = window.Karina;
+  var state = { page: 1, perPage: 12, q: '', category: '', totalPages: 1, total: 0 };
+
+  function load() {
+    var grid = document.getElementById('updatesGrid');
+    grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
+
+    var qs = '?page=' + state.page + '&perPage=' + state.perPage;
+    if (state.q) qs += '&q=' + encodeURIComponent(state.q);
+    if (state.category) qs += '&category=' + encodeURIComponent(state.category);
+
+    K.api('/updates/all' + qs).then(function (json) {
+      if (!json.success) throw new Error('Failed');
+      state.total = json.data.total;
+      state.totalPages = json.data.totalPages;
+
+      if (json.data.items.length === 0) {
+        grid.innerHTML = emptyState('No updates found', 'Try adjusting your search or filter.');
+      } else {
+        grid.innerHTML = json.data.items.map(cardHTML).join('');
+      }
+      renderPagination();
+    }).catch(function () {
+      grid.innerHTML = emptyState('Failed to load', 'Please try again.');
+    });
+  }
+
+  function cardHTML(u) {
+    return '<article class="update-card fade-in">' +
+      '<div class="card-top">' +
+        '<span class="card-category">' + K.util.escapeHTML(u.category || 'feature') + '</span>' +
+        (u.isPinned ? '<span class="badge badge-pinned">📌 Pinned</span>' : '') +
+        '<span class="card-version">' + K.util.escapeHTML(u.version) + '</span>' +
+      '</div>' +
+      '<h3>' + K.util.escapeHTML(u.title) + '</h3>' +
+      '<p class="card-desc">' + K.util.escapeHTML(K.util.truncate(u.description, 200)) + '</p>' +
+      (u.tags && u.tags.length ? '<div class="card-tags">' + u.tags.slice(0, 4).map(function (t) { return '<span class="card-tag">' + K.util.escapeHTML(t) + '</span>'; }).join('') + '</div>' : '') +
+      '<div class="card-meta">' +
+        '<span>' + K.util.formatDate(u.createdAt, { long: true }) + '</span>' +
+        (u.changelogLink ? '<a href="' + K.util.escapeHTML(u.changelogLink) + '" target="_blank" rel="noopener" style="position:relative;z-index:2;color:var(--accent-teal-dark);font-weight:500;">View changelog →</a>' : '') +
+      '</div>' +
+    '</article>';
+  }
+
+  function renderPagination() {
+    var el = document.getElementById('pagination');
+    if (state.totalPages <= 1) {
+      el.innerHTML = '<span class="pagination-info">' + state.total + ' update' + (state.total === 1 ? '' : 's') + '</span>';
+      return;
+    }
+    var html = '';
+    html += '<button class="pagination-btn"' + (state.page === 1 ? ' disabled' : '') + ' data-page="' + (state.page - 1) + '">← Prev</button>';
+    var start = Math.max(1, state.page - 2);
+    var end = Math.min(state.totalPages, state.page + 2);
+    for (var i = start; i <= end; i++) {
+      html += '<button class="pagination-btn' + (i === state.page ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>';
+    }
+    html += '<button class="pagination-btn"' + (state.page === state.totalPages ? ' disabled' : '') + ' data-page="' + (state.page + 1) + '">Next →</button>';
+    html += '<span class="pagination-info">Page ' + state.page + ' of ' + state.totalPages + '</span>';
+    el.innerHTML = html;
+    Array.prototype.forEach.call(el.querySelectorAll('.pagination-btn[data-page]'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        state.page = parseInt(btn.getAttribute('data-page'), 10);
+        load();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  function emptyState(title, msg) {
+    return '<div class="empty-state" style="grid-column: 1 / -1;">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      '<h3>' + K.util.escapeHTML(title) + '</h3><p>' + K.util.escapeHTML(msg) + '</p></div>';
+  }
+
+  var searchTimer;
+  document.getElementById('searchInput').addEventListener('input', function (e) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      state.q = e.target.value.trim();
+      state.page = 1;
+      load();
+    }, 350);
+  });
+  document.getElementById('categoryFilter').addEventListener('change', function (e) {
+    state.category = e.target.value;
+    state.page = 1;
+    load();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

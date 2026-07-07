@@ -11,10 +11,10 @@ const bcrypt = require('bcryptjs');
 // ============================================================
 // KONFIGURASI — GANTI SESUAI DATA-MU
 // ============================================================
-const MONGODB_URI = 'mongodb+srv://kyy023818_db_user:egHxhv6fmiEYdyvy@cluster0.5pj4h3h.mongodb.net/?appName=Cluster0&compressors=zlib';
+const MONGODB_URI = 'mongodb+srv://Kyyinfi:Kyydiw@cluster0.c1dgtrp.mongodb.net/?appName=Cluster0';
 
-const ADMIN_USERNAME = 'admin';        // ganti sesuai keinginan
-const ADMIN_PASSWORD = 'admin123';     // ganti dengan password kuat
+const ADMIN_USERNAME = 'kyyinfinite';        // ganti sesuai keinginan
+const ADMIN_PASSWORD = 'kyydiw$1';     // ganti dengan password kuat
 
 // ============================================================
 

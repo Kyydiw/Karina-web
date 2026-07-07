@@ -1,18 +1,23 @@
 {
-  "name": "karina-md-dashboard",
-  "version": "1.0.0",
+  "name": "karina-md-platform",
+  "version": "2.0.0",
   "private": true,
-  "description": "Karina-MD WhatsApp Bot Dashboard - Production modular web application",
+  "description": "Karina-MD Full-Stack Platform — scripts, snippets, support tickets & admin dashboard",
   "main": "api/index.js",
   "scripts": {
     "start": "node api/index.js",
-    "dev": "vercel dev"
+    "dev": "vercel dev",
+    "seed": "node scripts/seedAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
+    "dompurify": "^3.2.3",
     "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "jsdom": "^25.0.1",
     "jsonwebtoken": "^9.0.2",
+    "marked": "^14.1.4",
     "mongoose": "^8.9.5"
   },
   "devDependencies": {

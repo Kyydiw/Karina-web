@@ -1,304 +1,224 @@
+/* ============================================================
+   Karina-MD Platform — Home page main script
+   Loads: stats, featured scripts, latest updates, featured snippets
+   Keeps GSAP animations from the original design.
+   ============================================================ */
 (function () {
   'use strict';
 
-  /* ================================================================
-     CONSTANTS
-     ================================================================ */
-  var API_BASE = '/api';
+  var K = window.Karina;
+  var $ = function (s) { return document.querySelector(s); };
+  var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+
+  function escapeHTML(s) { return K.util.escapeHTML(s); }
+  function formatNumber(n) { return K.util.formatNumber(n); }
+  function formatDate(iso) { return K.util.formatDate(iso); }
+  function formatRelative(iso) { return K.util.formatRelative(iso); }
+  function formatBytes(b) { return K.util.formatBytes(b); }
+  function truncate(s, n) { return K.util.truncate(s, n); }
 
   /* ================================================================
-     UTILITY HELPERS
+     STATS BAR
      ================================================================ */
-  function $(selector) { return document.querySelector(selector); }
-  function $$(selector) { return document.querySelectorAll(selector); }
+  function loadStats() {
+    K.api('/admin/stats').then(function () {
+      // Public users can't access admin stats — use a softer approach
+    }).catch(function () { /* expected — fall through */ });
 
-  function getToken() {
-    try { return localStorage.getItem('karina_token'); } catch (e) { return null; }
-  }
-  function setToken(token) {
-    try { localStorage.setItem('karina_token', token); } catch (e) { /* noop */ }
-  }
-  function removeToken() {
-    try { localStorage.removeItem('karina_token'); } catch (e) { /* noop */ }
-  }
+    // Use aggregate counts via public endpoints
+    Promise.all([
+      fetch('/api/scripts/featured?limit=1').then(function (r) { return r.json(); }).catch(function () { return { success: false }; }),
+      fetch('/api/snippets/featured?limit=1').then(function (r) { return r.json(); }).catch(function () { return { success: false }; })
+    ]).then(function () {
+      // The home stats use approximations from listing endpoints
+      return Promise.all([
+        fetch('/api/scripts/list?perPage=1').then(function (r) { return r.json(); }).catch(function () { return null; }),
+        fetch('/api/snippets/list?perPage=1').then(function (r) { return r.json(); }).catch(function () { return null; }),
+        fetch('/api/updates/all?perPage=1').then(function (r) { return r.json(); }).catch(function () { return null; })
+      ]);
+    }).then(function (results) {
+      var scripts = results[0];
+      var snippets = results[1];
+      var updates = results[2];
 
-  function formatDate(iso) {
-    var d = new Date(iso);
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
-  }
+      if (scripts && scripts.success) setText('#statScripts', formatNumber(scripts.data.total));
+      if (snippets && snippets.success) setText('#statSnippets', formatNumber(snippets.data.total));
+      if (updates && updates.success) setText('#statUpdates', formatNumber(updates.data.total));
 
-  /* ================================================================
-     AUTH STATE
-     ================================================================ */
-  var isAuthenticated = false;
-  var currentUser = null;
-
-  function updateAuthUI() {
-    var loginBtn = $('#btnLogin');
-    var adminBtn = $('#btnAdmin');
-    var badge = $('#navUserBadge');
-    var usernameEl = $('#navUsername');
-    var adminPanel = $('#adminPanel');
-
-    if (isAuthenticated && currentUser) {
-      loginBtn.style.display = 'none';
-      adminBtn.style.display = 'inline-flex';
-      badge.classList.add('visible');
-      usernameEl.textContent = currentUser.username;
-    } else {
-      loginBtn.style.display = '';
-      adminBtn.style.display = 'none';
-      badge.classList.remove('visible');
-      usernameEl.textContent = '';
-      adminPanel.classList.remove('visible');
-    }
-  }
-
-  async function checkAuth() {
-    var token = getToken();
-    if (!token) { updateAuthUI(); return; }
-
-    try {
-      var res = await fetch(API_BASE + '/auth/check', {
-        method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      var json = await res.json();
-      if (json.success && json.data) {
-        isAuthenticated = true;
-        currentUser = json.data;
-      } else {
-        removeToken();
+      // Fetch download count via featured scripts (which include downloadCount)
+      return fetch('/api/scripts/list?perPage=50&sort=downloads').then(function (r) { return r.json(); });
+    }).then(function (json) {
+      if (json && json.success) {
+        var totalDl = 0;
+        json.data.items.forEach(function (s) { totalDl += (s.downloadCount || 0); });
+        setText('#statDownloads', formatNumber(totalDl));
       }
-    } catch (e) {
-      /* Network error - keep existing state silently */
-    }
-    updateAuthUI();
+    }).catch(function () { /* noop */ });
+  }
+
+  function setText(sel, val) {
+    var el = document.querySelector(sel);
+    if (el) el.textContent = val;
   }
 
   /* ================================================================
-     LOGIN MODAL
+     FEATURED SCRIPTS
      ================================================================ */
-  function openLoginModal() {
-    $('#loginModal').classList.add('active');
-    $('#loginUsername').focus();
-    $('#loginError').classList.remove('visible');
-    $('#loginError').textContent = '';
-  }
+  function loadFeaturedScripts() {
+    var grid = $('#featuredScriptsGrid');
+    if (!grid) return;
 
-  function closeLoginModal() {
-    $('#loginModal').classList.remove('active');
-    $('#loginForm').reset();
-  }
-
-  async function handleLogin(e) {
-    e.preventDefault();
-    var username = $('#loginUsername').value.trim();
-    var password = $('#loginPassword').value;
-    var errorEl = $('#loginError');
-    var submitBtn = $('#loginSubmitBtn');
-
-    errorEl.classList.remove('visible');
-
-    if (!username || !password) {
-      errorEl.textContent = 'Please fill in all fields.';
-      errorEl.classList.add('visible');
-      return;
-    }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Signing in...';
-
-    try {
-      var res = await fetch(API_BASE + '/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username, password: password })
-      });
-      var json = await res.json();
-
-      if (json.success) {
-        setToken(json.data.token);
-        isAuthenticated = true;
-        currentUser = { id: json.data.username, username: json.data.username };
-        updateAuthUI();
-        closeLoginModal();
-        showAdminPanel();
-      } else {
-        errorEl.textContent = json.message || 'Login failed.';
-        errorEl.classList.add('visible');
+    K.api('/scripts/featured?limit=6').then(function (json) {
+      if (!json.success || !json.data || json.data.length === 0) {
+        grid.innerHTML = emptyStateHTML('No featured scripts yet', 'Check back soon — new scripts are being added regularly.');
+        return;
       }
-    } catch (err) {
-      errorEl.textContent = 'Network error. Please try again.';
-      errorEl.classList.add('visible');
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Sign In';
-    }
-  }
 
-  function handleLogout() {
-    removeToken();
-    isAuthenticated = false;
-    currentUser = null;
-    updateAuthUI();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+      grid.innerHTML = json.data.map(function (s) {
+        return scriptCardHTML(s);
+      }).join('');
 
-  function bindAuthEvents() {
-    $('#btnLogin').addEventListener('click', function (e) { e.preventDefault(); openLoginModal(); });
-    $('#modalCloseBtn').addEventListener('click', closeLoginModal);
-    $('#loginForm').addEventListener('submit', handleLogin);
-    $('#btnLogout').addEventListener('click', handleLogout);
-    $('#btnAdmin').addEventListener('click', function (e) { e.preventDefault(); showAdminPanel(); });
-
-    $('#loginModal').addEventListener('click', function (e) {
-      if (e.target === this) closeLoginModal();
-    });
-
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && $('#loginModal').classList.contains('active')) {
-        closeLoginModal();
+      if (typeof gsap !== 'undefined') {
+        gsap.from('#featuredScriptsGrid .script-card', {
+          opacity: 0, y: 30, duration: 0.6, stagger: 0.08, ease: 'power3.out',
+          scrollTrigger: { trigger: '#featuredScriptsGrid', start: 'top 85%' }
+        });
       }
+    }).catch(function () {
+      grid.innerHTML = emptyStateHTML('Failed to load scripts', 'Please refresh the page to try again.');
     });
   }
 
+  function scriptCardHTML(s) {
+    var tags = (s.tags || []).slice(0, 3).map(function (t) {
+      return '<span class="card-tag">' + escapeHTML(t) + '</span>';
+    }).join('');
+    return '<article class="script-card fade-in">' +
+      '<a class="card-link-overlay" href="/scripts/' + (s.slug || s._id) + '" aria-label="' + escapeHTML(s.title) + '"></a>' +
+      '<div class="card-top">' +
+        '<span class="card-category">' + escapeHTML(s.category) + '</span>' +
+        (s.isFeatured ? '<span class="badge badge-featured">Featured</span>' : '') +
+        '<span class="card-version">' + escapeHTML(s.version) + '</span>' +
+      '</div>' +
+      '<h3>' + escapeHTML(s.title) + '</h3>' +
+      '<p class="card-desc">' + escapeHTML(truncate(s.description, 160)) + '</p>' +
+      (tags ? '<div class="card-tags">' + tags + '</div>' : '') +
+      '<div class="card-meta">' +
+        '<div class="card-meta-group">' +
+          '<span class="card-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' + formatNumber(s.downloadCount || 0) + '</span>' +
+          '<span class="card-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' + formatNumber(s.viewCount || 0) + '</span>' +
+        '</div>' +
+        '<span class="card-meta-item">' + formatRelative(s.createdAt) + '</span>' +
+      '</div>' +
+    '</article>';
+  }
+
   /* ================================================================
-     ADMIN PANEL
+     LATEST UPDATES
      ================================================================ */
-  function showAdminPanel() {
-    var panel = $('#adminPanel');
-    panel.classList.add('visible');
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    loadAdminUpdates();
-  }
+  function loadLatestUpdates() {
+    var grid = $('#latestUpdatesGrid');
+    if (!grid) return;
 
-  async function loadAdminUpdates() {
-    var container = $('#adminUpdatesList');
-    container.innerHTML = '<div class="admin-empty-state">Loading updates...</div>';
-
-    try {
-      var res = await fetch(API_BASE + '/updates/latest?limit=20');
-      var json = await res.json();
-
-      if (json.success && json.data && json.data.length > 0) {
-        container.innerHTML = json.data.map(function (u) {
-          return '<div class="admin-update-item">' +
-            '<div class="update-meta">' +
-              '<span class="update-version">' + escapeHTML(u.version) + '</span>' +
-              '<span class="update-date">' + formatDate(u.createdAt) + '</span>' +
-            '</div>' +
-            '<div class="update-title">' + escapeHTML(u.title) + '</div>' +
-            '<div class="update-desc">' + escapeHTML(u.description) + '</div>' +
-          '</div>';
-        }).join('');
-      } else {
-        container.innerHTML = '<div class="admin-empty-state">No updates published yet. Create your first update above.</div>';
+    K.api('/updates/latest?limit=6').then(function (json) {
+      if (!json.success || !json.data || json.data.length === 0) {
+        grid.innerHTML = emptyStateHTML('No updates yet', 'Updates will appear here once published.');
+        return;
       }
-    } catch (e) {
-      container.innerHTML = '<div class="admin-empty-state">Failed to load updates.</div>';
-    }
-  }
 
-  async function handleUpload(e) {
-    e.preventDefault();
-    var title = $('#updateTitle').value.trim();
-    var version = $('#updateVersion').value.trim();
-    var description = $('#updateDesc').value.trim();
-    var changelogLink = $('#updateLink').value.trim();
-    var statusEl = $('#uploadStatus');
-    var submitBtn = $('#uploadSubmitBtn');
-    var token = getToken();
+      grid.innerHTML = json.data.map(function (u) {
+        return updateCardHTML(u);
+      }).join('');
 
-    statusEl.className = 'upload-status';
-    statusEl.textContent = '';
-
-    if (!title || !version || !description) {
-      statusEl.className = 'upload-status error';
-      statusEl.textContent = 'Title, version, and description are required.';
-      return;
-    }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Publishing...';
-
-    try {
-      var res = await fetch(API_BASE + '/updates/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token
-        },
-        body: JSON.stringify({ title: title, version: version, description: description, changelogLink: changelogLink })
-      });
-      var json = await res.json();
-
-      if (json.success) {
-        statusEl.className = 'upload-status success';
-        statusEl.textContent = 'Update published successfully!';
-        $('#uploadForm').reset();
-        loadAdminUpdates();
-        fetchLatestUpdates(); // refresh public grid too
-      } else {
-        statusEl.className = 'upload-status error';
-        statusEl.textContent = json.message || 'Failed to publish update.';
+      if (typeof gsap !== 'undefined') {
+        gsap.from('#latestUpdatesGrid .update-card', {
+          opacity: 0, y: 30, duration: 0.6, stagger: 0.08, ease: 'power3.out',
+          scrollTrigger: { trigger: '#latestUpdatesGrid', start: 'top 85%' }
+        });
       }
-    } catch (err) {
-      statusEl.className = 'upload-status error';
-      statusEl.textContent = 'Network error. Please try again.';
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Publish Update';
-    }
+    }).catch(function () {
+      grid.innerHTML = emptyStateHTML('Failed to load updates', 'Please refresh the page to try again.');
+    });
   }
 
-  function bindAdminEvents() {
-    $('#uploadForm').addEventListener('submit', handleUpload);
+  function updateCardHTML(u) {
+    return '<article class="update-card fade-in">' +
+      '<div class="card-top">' +
+        '<span class="card-category">' + escapeHTML(u.category || 'feature') + '</span>' +
+        (u.isPinned ? '<span class="badge badge-pinned">Pinned</span>' : '') +
+        '<span class="card-version">' + escapeHTML(u.version) + '</span>' +
+      '</div>' +
+      '<h3>' + escapeHTML(u.title) + '</h3>' +
+      '<p class="card-desc">' + escapeHTML(truncate(u.description, 180)) + '</p>' +
+      '<div class="card-meta">' +
+        '<span class="card-meta-item">' + formatDate(u.createdAt, { long: true }) + '</span>' +
+        (u.changelogLink ? '<a href="' + escapeHTML(u.changelogLink) + '" target="_blank" rel="noopener" style="position:relative;z-index:2;color:var(--accent-teal-dark);font-weight:500;">View changelog →</a>' : '') +
+      '</div>' +
+    '</article>';
   }
 
   /* ================================================================
-     DYNAMIC UPDATES (PUBLIC GRID)
+     FEATURED SNIPPETS
      ================================================================ */
-  async function fetchLatestUpdates() {
-    var featureList = $('#featureList');
-    if (!featureList) return;
+  function loadFeaturedSnippets() {
+    var grid = $('#featuredSnippetsGrid');
+    if (!grid) return;
 
-    try {
-      var res = await fetch(API_BASE + '/updates/latest?limit=10');
-      var json = await res.json();
-
-      if (json.success && json.data && json.data.length > 0) {
-        featureList.innerHTML = json.data.map(function (u, i) {
-          var num = String(i + 1).padStart(2, '0');
-          return '<div class="feature-card tilt-card">' +
-            '<div class="feature-badge">' + num + '</div>' +
-            '<div class="feature-text">' +
-              '<h4>' + escapeHTML(u.title) + '</h4>' +
-              '<p>' + escapeHTML(u.description) + '</p>' +
-            '</div>' +
-          '</div>';
-        }).join('');
-
-        // Re-bind tilt effects on newly injected cards
-        if (typeof gsap !== 'undefined') {
-          bindTiltCards();
-        }
+    K.api('/snippets/featured?limit=6').then(function (json) {
+      if (!json.success || !json.data || json.data.length === 0) {
+        grid.innerHTML = emptyStateHTML('No featured snippets yet', 'Reusable code snippets will appear here.');
+        return;
       }
-      // If no data, keep the static fallback HTML already in place
-    } catch (e) {
-      /* Silently fail - static fallback remains visible */
-    }
+
+      grid.innerHTML = json.data.map(function (s) {
+        return snippetCardHTML(s);
+      }).join('');
+
+      if (typeof gsap !== 'undefined') {
+        gsap.from('#featuredSnippetsGrid .snippet-card', {
+          opacity: 0, y: 30, duration: 0.6, stagger: 0.08, ease: 'power3.out',
+          scrollTrigger: { trigger: '#featuredSnippetsGrid', start: 'top 85%' }
+        });
+      }
+    }).catch(function () {
+      grid.innerHTML = emptyStateHTML('Failed to load snippets', 'Please refresh the page to try again.');
+    });
   }
 
-  function escapeHTML(str) {
-    var div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  function snippetCardHTML(s) {
+    var preview = (s.code || '').slice(0, 240);
+    var tags = (s.tags || []).slice(0, 3).map(function (t) {
+      return '<span class="card-tag">' + escapeHTML(t) + '</span>';
+    }).join('');
+    return '<article class="snippet-card fade-in">' +
+      '<a class="card-link-overlay" href="/snippets/' + (s.slug || s._id) + '" aria-label="' + escapeHTML(s.title) + '"></a>' +
+      '<div class="card-top">' +
+        '<span class="card-category">' + escapeHTML(s.language) + '</span>' +
+        (s.isFeatured ? '<span class="badge badge-featured">Featured</span>' : '') +
+      '</div>' +
+      '<h3>' + escapeHTML(s.title) + '</h3>' +
+      '<p class="card-desc" style="margin-bottom: 0;">' + escapeHTML(truncate(s.description, 100)) + '</p>' +
+      '<div class="code-preview" style="max-height: 120px;"><pre>' + escapeHTML(preview) + (s.code && s.code.length > 240 ? '\n…' : '') + '</pre></div>' +
+      (tags ? '<div class="card-tags">' + tags + '</div>' : '') +
+      '<div class="card-meta">' +
+        '<div class="card-meta-group">' +
+          '<span class="card-meta-item">by ' + escapeHTML(s.author || 'admin') + '</span>' +
+        '</div>' +
+        '<span class="card-meta-item">' + formatRelative(s.createdAt) + '</span>' +
+      '</div>' +
+    '</article>';
+  }
+
+  function emptyStateHTML(title, msg) {
+    return '<div class="empty-state" style="grid-column: 1 / -1;">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      '<h3>' + escapeHTML(title) + '</h3>' +
+      '<p>' + escapeHTML(msg) + '</p>' +
+    '</div>';
   }
 
   /* ================================================================
-     GSAP ANIMATIONS
+     GSAP ANIMATIONS (preserved from original design)
      ================================================================ */
   function waitForGSAP(callback) {
     if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
@@ -308,34 +228,9 @@
     }
   }
 
-  function bindTiltCards() {
-    var tiltCards = $$('.tilt-card');
-    tiltCards.forEach(function (card) {
-      // Skip if already bound
-      if (card._tiltBound) return;
-      card._tiltBound = true;
-
-      card.addEventListener('mousemove', function (e) {
-        var rect = card.getBoundingClientRect();
-        var x = e.clientX - rect.left;
-        var y = e.clientY - rect.top;
-        var centerX = rect.width / 2;
-        var centerY = rect.height / 2;
-        var rotateX = ((y - centerY) / centerY) * -6;
-        var rotateY = ((x - centerX) / centerX) * 6;
-        card.style.transform = 'perspective(800px) rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) scale3d(1.02, 1.02, 1.02)';
-      });
-
-      card.addEventListener('mouseleave', function () {
-        card.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-      });
-    });
-  }
-
   function initAnimations() {
     gsap.registerPlugin(ScrollTrigger);
 
-    /* Reveal animations */
     gsap.utils.toArray('.reveal-up').forEach(function (el, i) {
       gsap.to(el, {
         opacity: 1, y: 0,
@@ -346,20 +241,6 @@
       });
     });
 
-    gsap.utils.toArray('.reveal-left').forEach(function (el) {
-      gsap.to(el, {
-        opacity: 1, x: 0, duration: 0.8, ease: 'power3.out',
-        scrollTrigger: { trigger: el, start: 'top 88%' }
-      });
-    });
-
-    gsap.utils.toArray('.reveal-right').forEach(function (el) {
-      gsap.to(el, {
-        opacity: 1, x: 0, duration: 0.8, ease: 'power3.out',
-        scrollTrigger: { trigger: el, start: 'top 88%' }
-      });
-    });
-
     gsap.utils.toArray('.reveal-scale').forEach(function (el) {
       gsap.to(el, {
         opacity: 1, scale: 1, duration: 1, ease: 'power3.out',
@@ -367,7 +248,6 @@
       });
     });
 
-    /* Hero content stagger */
     var heroItems = $$('.hero-content .reveal-up');
     if (heroItems.length) {
       gsap.to(heroItems, {
@@ -377,7 +257,6 @@
       });
     }
 
-    /* Hero scroll parallax */
     var heroContainer = $('.hero-container');
     if (heroContainer) {
       ScrollTrigger.create({
@@ -393,7 +272,6 @@
       });
     }
 
-    /* Mouse parallax for floating shapes */
     var floatingShapes = $$('.float-shape');
     if (floatingShapes.length) {
       document.addEventListener('mousemove', function (e) {
@@ -407,21 +285,16 @@
           });
         });
       });
+
+      floatingShapes.forEach(function (shape, i) {
+        gsap.to(shape, {
+          y: '+=12', rotation: i % 2 === 0 ? 8 : -8,
+          duration: 2.5 + i * 0.4, repeat: -1, yoyo: true,
+          ease: 'sine.inOut', delay: i * 0.3
+        });
+      });
     }
 
-    /* Floating shape ambient animation */
-    floatingShapes.forEach(function (shape, i) {
-      gsap.to(shape, {
-        y: '+=12', rotation: i % 2 === 0 ? 8 : -8,
-        duration: 2.5 + i * 0.4, repeat: -1, yoyo: true,
-        ease: 'sine.inOut', delay: i * 0.3
-      });
-    });
-
-    /* 3D tilt effect */
-    bindTiltCards();
-
-    /* Particle system */
     var particlesContainer = $('#heroParticles');
     if (particlesContainer) {
       for (var i = 0; i < 25; i++) {
@@ -448,7 +321,6 @@
       }
     }
 
-    /* Slider dot interaction */
     var dots = $$('.slider-dot');
     dots.forEach(function (dot) {
       dot.addEventListener('click', function () {
@@ -457,72 +329,12 @@
       });
     });
 
-    /* Widget close buttons */
-    $$('.widget-close').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var card = btn.closest('.widget-card');
-        gsap.to(card, {
-          opacity: 0, scale: 0.8, duration: 0.3, ease: 'power2.in',
-          onComplete: function () { card.style.display = 'none'; }
-        });
-      });
-    });
-
-    /* Navbar scroll shadow */
     var navbar = $('.navbar');
-    window.addEventListener('scroll', function () {
-      navbar.style.boxShadow = window.scrollY > 20
-        ? '0 2px 20px rgba(44, 62, 80, 0.06)'
-        : 'none';
-    });
-
-    /* Artwork card hover glow */
-    $$('.artwork-card').forEach(function (card) {
-      card.addEventListener('mouseenter', function () {
-        gsap.to(card, { boxShadow: '0 8px 32px rgba(80, 200, 194, 0.15)', duration: 0.3 });
-      });
-      card.addEventListener('mouseleave', function () {
-        gsap.to(card, { boxShadow: 'none', duration: 0.3 });
-      });
-    });
-
-    /* CTA button hover */
-    $$('.cta-btn').forEach(function (btn) {
-      btn.addEventListener('mouseenter', function () {
-        gsap.fromTo(btn, { scale: 0.97 }, { scale: 1, duration: 0.4, ease: 'elastic.out(1, 0.5)' });
-      });
-    });
-
-    /* Search item hover */
-    $$('.search-item').forEach(function (item) {
-      item.addEventListener('mouseenter', function () {
-        gsap.to(item, { x: 4, duration: 0.25, ease: 'power2.out' });
-        var svg = item.querySelector('svg');
-        if (svg) gsap.to(svg, { rotation: 15, duration: 0.3, ease: 'power2.out' });
-      });
-      item.addEventListener('mouseleave', function () {
-        gsap.to(item, { x: 0, duration: 0.25, ease: 'power2.out' });
-        var svg = item.querySelector('svg');
-        if (svg) gsap.to(svg, { rotation: 0, duration: 0.3, ease: 'power2.out' });
-      });
-    });
-
-    /* Grid cards stagger */
-    $$('.grid-container > .card').forEach(function (card, idx) {
-      gsap.to(card, {
-        opacity: 1, y: 0,
-        duration: 0.7, delay: idx * 0.15, ease: 'power3.out',
-        scrollTrigger: { trigger: card, start: 'top 90%', toggleActions: 'play none none none' }
-      });
-    });
-
-    /* Dev credit glow pulse */
-    var devCredit = $('.dev-credit');
-    if (devCredit) {
-      gsap.to(devCredit, {
-        textShadow: '0 0 20px rgba(80, 200, 194, 0.3)',
-        duration: 2, repeat: -1, yoyo: true, ease: 'sine.inOut'
+    if (navbar) {
+      window.addEventListener('scroll', function () {
+        navbar.style.boxShadow = window.scrollY > 20
+          ? '0 2px 20px rgba(44, 62, 80, 0.06)'
+          : 'none';
       });
     }
 
@@ -533,10 +345,10 @@
      BOOTSTRAP
      ================================================================ */
   function init() {
-    bindAuthEvents();
-    bindAdminEvents();
-    checkAuth();
-    fetchLatestUpdates();
+    loadStats();
+    loadFeaturedScripts();
+    loadLatestUpdates();
+    loadFeaturedSnippets();
     waitForGSAP(initAnimations);
   }
 

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket — Karina-MD Support</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+
+<section class="page-hero" style="padding-bottom: 24px;">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="sep">/</span>
+      <a href="/support">Support</a><span class="sep">/</span>
+      <span id="bcTicket">Loading…</span>
+    </div>
+  </div>
+</section>
+
+<section class="section-sm" style="padding-top: 24px;">
+  <div class="container">
+    <div id="ticketContainer">
+      <div class="skeleton-card" style="height: 300px;"></div>
+    </div>
+  </div>
+</section>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var K = window.Karina;
+
+  var path = window.location.pathname;
+  var ticketNumber = path.replace(/^\/support\/ticket\//, '').replace(/\/$/, '');
+  var token = K.util.getQueryParam('token') || '';
+
+  if (!ticketNumber) {
+    window.location.href = '/support';
+    return;
+  }
+
+  // If admin is logged in, they can fetch without token
+  var isAdmin = K.auth.isAdmin();
+  var url = '/tickets/' + encodeURIComponent(ticketNumber);
+  if (!isAdmin && token) url += '?token=' + encodeURIComponent(token);
+
+  function load() {
+    K.api(url).then(function (json) {
+      if (!json.success) throw new Error('Failed');
+      var t = json.data;
+      document.title = t.ticketNumber + ' — Support Ticket';
+      document.getElementById('bcTicket').textContent = t.ticketNumber;
+
+      var isAdminView = K.auth.isAdmin();
+      // For admins, use their bearer token; for users, use the access token in body
+      var threadHTML = (t.messages || []).map(function (m) {
+        var time = new Date(m.createdAt || m.updatedAt).toLocaleString();
+        var initials = (m.senderName || m.sender || '?').charAt(0).toUpperCase();
+        return '<div class="ticket-message ' + m.sender + '">' +
+          '<div class="ticket-msg-avatar">' + K.util.escapeHTML(initials) + '</div>' +
+          '<div class="ticket-msg-body">' +
+            '<div class="ticket-msg-header">' +
+              '<span class="ticket-msg-name">' + K.util.escapeHTML(m.senderName || m.sender) + (m.sender === 'admin' ? ' (Staff)' : m.sender === 'system' ? '' : ' (You)') + '</span>' +
+              '<span class="ticket-msg-time">' + time + '</span>' +
+            '</div>' +
+            '<div class="ticket-msg-content">' + K.util.escapeHTML(m.message) + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var statusControls = isAdminView ? (
+        '<select id="statusSelect" class="filter-select">' +
+          ['open','in-progress','resolved','closed'].map(function (s) {
+            return '<option value="' + s + '"' + (s === t.status ? ' selected' : '') + '>' + s + '</option>';
+          }).join('') +
+        '</select>' +
+        '<button class="btn btn-sm btn-primary" id="updateStatusBtn">Update Status</button>'
+      ) : '';
+
+      var html = '<div class="detail-header fade-in">' +
+        '<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center;">' +
+          '<span class="card-category">' + K.util.escapeHTML(t.category) + '</span>' +
+          '<span class="badge badge-' + t.priority + '">' + t.priority + ' priority</span>' +
+          '<span class="badge badge-' + t.status + '">' + t.status + '</span>' +
+          '<code style="font-size: 12px; color: var(--text-muted); margin-left: auto;">' + K.util.escapeHTML(t.ticketNumber) + '</code>' +
+        '</div>' +
+        '<h1>' + K.util.escapeHTML(t.subject) + '</h1>' +
+        '<p style="font-size: 15px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">' + K.util.escapeHTML(t.description) + '</p>' +
+        '<div class="detail-meta">' +
+          '<span class="detail-meta-item">👤 ' + K.util.escapeHTML(t.name) + '</span>' +
+          '<span class="detail-meta-item">✉️ ' + K.util.escapeHTML(t.email) + '</span>' +
+          (t.whatsapp ? '<span class="detail-meta-item">📱 ' + K.util.escapeHTML(t.whatsapp) + '</span>' : '') +
+          '<span class="detail-meta-item">🕒 ' + K.util.formatRelative(t.createdAt) + '</span>' +
+          (t.assignedTo ? '<span class="detail-meta-item">🛠 Assigned to ' + K.util.escapeHTML(t.assignedTo) + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-body">' +
+        '<div class="detail-main fade-in">' +
+          '<h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">Conversation (' + (t.messages || []).length + ')</h3>' +
+          '<div class="ticket-thread">' + threadHTML + '</div>' +
+          '<div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-soft);">' +
+            '<h4 style="font-size: 15px; font-weight: 600; margin-bottom: 12px;">' + (isAdminView ? 'Reply as admin' : 'Add a reply') + '</h4>' +
+            '<textarea id="replyText" class="form-textarea" placeholder="Type your reply..." style="min-height: 120px;"></textarea>' +
+            '<button class="btn btn-primary" id="replyBtn" style="margin-top: 12px;">Send Reply</button>' +
+          '</div>' +
+        '</div>' +
+        '<aside class="detail-sidebar">' +
+          (isAdminView ?
+            '<div class="sidebar-card">' +
+              '<h4>Admin controls</h4>' +
+              '<div class="form-group" style="margin: 0 0 12px 0;">' +
+                '<label class="form-label" for="statusSelect">Status</label>' +
+                statusControls +
+              '</div>' +
+              '<button class="btn btn-danger btn-block btn-sm" id="deleteTicketBtn" style="margin-top: 8px;">Delete Ticket</button>' +
+            '</div>' : '') +
+          '<div class="sidebar-card">' +
+            '<h4>Ticket info</h4>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Number</span><span class="sidebar-stat-value" style="font-size: 11px;">' + K.util.escapeHTML(t.ticketNumber) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Category</span><span class="sidebar-stat-value">' + K.util.escapeHTML(t.category) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Priority</span><span class="sidebar-stat-value">' + K.util.escapeHTML(t.priority) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Status</span><span class="sidebar-stat-value">' + K.util.escapeHTML(t.status) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Created</span><span class="sidebar-stat-value" style="font-size: 11px;">' + K.util.formatDate(t.createdAt) + '</span></div>' +
+            (t.resolvedAt ? '<div class="sidebar-stat"><span class="sidebar-stat-label">Resolved</span><span class="sidebar-stat-value" style="font-size: 11px;">' + K.util.formatDate(t.resolvedAt) + '</span></div>' : '') +
+            (t.closedAt ? '<div class="sidebar-stat"><span class="sidebar-stat-label">Closed</span><span class="sidebar-stat-value" style="font-size: 11px;">' + K.util.formatDate(t.closedAt) + '</span></div>' : '') +
+          '</div>' +
+          '<div class="sidebar-card">' +
+            '<h4>Submitter</h4>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Name</span><span class="sidebar-stat-value" style="font-size: 12px;">' + K.util.escapeHTML(t.name) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Email</span><span class="sidebar-stat-value" style="font-size: 11px; word-break: break-all;">' + K.util.escapeHTML(t.email) + '</span></div>' +
+            (t.whatsapp ? '<div class="sidebar-stat"><span class="sidebar-stat-label">WhatsApp</span><span class="sidebar-stat-value" style="font-size: 11px;">' + K.util.escapeHTML(t.whatsapp) + '</span></div>' : '') +
+            (isAdminView && t.whatsapp ? '<a href="https://wa.me/' + K.util.escapeHTML(t.whatsapp.replace(/[^0-9]/g, '')) + '" target="_blank" rel="noopener" class="btn btn-outline btn-block btn-sm" style="margin-top: 12px;">Contact via WhatsApp</a>' : '') +
+          '</div>' +
+          '<div class="sidebar-card">' +
+            '<a href="/support" class="btn btn-secondary btn-block">← Back to Support</a>' +
+          '</div>' +
+        '</aside>' +
+      '</div>';
+
+      document.getElementById('ticketContainer').innerHTML = html;
+
+      // Bind reply
+      document.getElementById('replyBtn').addEventListener('click', function () {
+        var msg = document.getElementById('replyText').value.trim();
+        if (!msg) { K.ui.toast('Please enter a message.', 'warning'); return; }
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+        var opts = { method: 'POST', body: JSON.stringify({ message: msg }) };
+        if (!isAdminView) {
+          // Include token in body for non-admin
+          opts.body = JSON.stringify({ message: msg, token: token });
+        }
+        K.api('/tickets/' + encodeURIComponent(ticketNumber) + '/reply', opts).then(function (json) {
+          if (json.success) {
+            K.ui.toast('Reply sent!', 'success');
+            load(); // reload thread
+          } else {
+            K.ui.toast(json.message || 'Failed to send reply.', 'error');
+          }
+        }).catch(function (err) {
+          K.ui.toast(err.message || 'Network error.', 'error');
+        }).finally(function () {
+          btn.disabled = false;
+          btn.textContent = 'Send Reply';
+        });
+      });
+
+      // Bind admin status update
+      var updateBtn = document.getElementById('updateStatusBtn');
+      if (updateBtn) {
+        updateBtn.addEventListener('click', function () {
+          var newStatus = document.getElementById('statusSelect').value;
+          K.api('/tickets/' + encodeURIComponent(ticketNumber) + '/status', {
+            method: 'PUT',
+            body: JSON.stringify({ status: newStatus })
+          }).then(function (json) {
+            if (json.success) {
+              K.ui.toast('Status updated to ' + newStatus, 'success');
+              load();
+            } else {
+              K.ui.toast(json.message || 'Failed to update.', 'error');
+            }
+          }).catch(function (err) { K.ui.toast(err.message || 'Failed.', 'error'); });
+        });
+      }
+
+      // Bind admin delete
+      var delBtn = document.getElementById('deleteTicketBtn');
+      if (delBtn) {
+        delBtn.addEventListener('click', function () {
+          if (!confirm('Delete this ticket permanently? This cannot be undone.')) return;
+          K.api('/tickets/' + encodeURIComponent(ticketNumber), { method: 'DELETE' }).then(function (json) {
+            if (json.success) {
+              K.ui.toast('Ticket deleted.', 'success');
+              setTimeout(function () { window.location.href = '/admin'; }, 800);
+            } else {
+              K.ui.toast(json.message || 'Failed.', 'error');
+            }
+          }).catch(function (err) { K.ui.toast(err.message || 'Failed.', 'error'); });
+        });
+      }
+    }).catch(function (err) {
+      document.getElementById('ticketContainer').innerHTML =
+        '<div class="empty-state">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>' +
+          '<h3>Ticket not accessible</h3>' +
+          '<p>The ticket may not exist, or your access token is invalid. If you are an admin, please log in first.</p>' +
+          '<a href="/support" class="btn btn-primary" style="margin-top: 16px;">← Back to Support</a>' +
+        '</div>';
+    });
+  }
+
+  // Wait for auth check if a token might be needed
+  if (K.auth.isAdmin()) {
+    load();
+  } else if (token) {
+    load();
+  } else {
+    // Check if just-logged-in admin (refresh auth state then try)
+    K.auth.refresh().then(function () {
+      if (K.auth.isAdmin()) {
+        load();
+      } else {
+        document.getElementById('ticketContainer').innerHTML =
+          '<div class="empty-state">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+            '<h3>Access token required</h3>' +
+            '<p>Please open this ticket from the link in your confirmation, or log in as admin.</p>' +
+            '<a href="/support" class="btn btn-primary" style="margin-top: 16px;">← Back to Support</a>' +
+          '</div>';
+      }
+    });
+  }
+})();
+</script>
+</body>
+</html>

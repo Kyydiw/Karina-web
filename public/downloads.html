@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Downloads — Karina-MD Platform</title>
+<meta name="description" content="Browse and download all available WhatsApp bot scripts. Sorted by popularity.">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="sep">/</span><span>Downloads</span>
+    </div>
+    <h1>Download Center</h1>
+    <p>All downloadable scripts in one place, sorted by download count. Get the file you need in one click — no redirects, no waiting.</p>
+  </div>
+</section>
+
+<section class="section-sm">
+  <div class="container">
+    <div class="filters-bar">
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" class="form-input" placeholder="Search downloadable scripts...">
+      </div>
+      <select id="sortFilter" class="filter-select">
+        <option value="downloads">Most downloaded</option>
+        <option value="newest">Newest first</option>
+        <option value="popular">Most viewed</option>
+      </select>
+    </div>
+
+    <div id="downloadList">
+      <div class="skeleton-card" style="height: 100px;"></div>
+      <div class="skeleton-card" style="height: 100px;"></div>
+      <div class="skeleton-card" style="height: 100px;"></div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+</section>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var K = window.Karina;
+  var state = { page: 1, perPage: 15, q: '', sort: 'downloads', totalPages: 1, total: 0 };
+
+  function load() {
+    var list = document.getElementById('downloadList');
+    list.innerHTML = '<div class="skeleton-card" style="height: 100px;"></div><div class="skeleton-card" style="height: 100px;"></div>';
+
+    var qs = '?page=' + state.page + '&perPage=' + state.perPage + '&sort=' + state.sort;
+    if (state.q) qs += '&q=' + encodeURIComponent(state.q);
+
+    K.api('/scripts/list' + qs).then(function (json) {
+      if (!json.success) throw new Error('Failed');
+      state.total = json.data.total;
+      state.totalPages = json.data.totalPages;
+
+      if (json.data.items.length === 0) {
+        list.innerHTML = emptyState('No scripts found', 'Try adjusting your search.');
+      } else {
+        list.innerHTML = '<div class="cards-grid list-view">' + json.data.items.map(rowHTML).join('') + '</div>';
+      }
+      renderPagination();
+    }).catch(function () {
+      list.innerHTML = emptyState('Failed to load', 'Please try again.');
+    });
+  }
+
+  function rowHTML(s) {
+    return '<article class="script-card fade-in" style="flex-direction:row; align-items:center; gap: 20px; padding: 16px 20px;">' +
+      '<div style="width:48px; height:48px; border-radius: 10px; background: linear-gradient(135deg, var(--accent-teal-glow), var(--accent-teal)); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">' +
+        '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+      '</div>' +
+      '<div style="flex:1; min-width:0;">' +
+        '<div style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px; flex-wrap: wrap;">' +
+          '<a href="/scripts/' + (s.slug || s._id) + '" style="font-size: 16px; font-weight: 700; color: var(--text-charcoal); position: relative; z-index: 2;">' + K.util.escapeHTML(s.title) + '</a>' +
+          '<span class="card-version">' + K.util.escapeHTML(s.version) + '</span>' +
+          '<span class="card-category">' + K.util.escapeHTML(s.category) + '</span>' +
+        '</div>' +
+        '<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">' + K.util.escapeHTML(K.util.truncate(s.description, 140)) + '</p>' +
+        '<div style="display: flex; gap: 16px; margin-top: 6px; font-size: 12px; color: var(--text-light);">' +
+          '<span>⬇ ' + K.util.formatNumber(s.downloadCount || 0) + ' downloads</span>' +
+          '<span>👁 ' + K.util.formatNumber(s.viewCount || 0) + ' views</span>' +
+          '<span>📦 ' + K.util.formatBytes(s.fileSize || 0) + '</span>' +
+          '<span>' + K.util.formatRelative(s.createdAt) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<a href="/api/scripts/' + (s.slug || s._id) + '/download" class="btn btn-primary" style="flex-shrink: 0; position: relative; z-index: 2;">' +
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+        'Download' +
+      '</a>' +
+    '</article>';
+  }
+
+  function renderPagination() {
+    var el = document.getElementById('pagination');
+    if (state.totalPages <= 1) {
+      el.innerHTML = '<span class="pagination-info">' + state.total + ' script' + (state.total === 1 ? '' : 's') + ' total</span>';
+      return;
+    }
+    var html = '';
+    html += '<button class="pagination-btn"' + (state.page === 1 ? ' disabled' : '') + ' data-page="' + (state.page - 1) + '">← Prev</button>';
+    var start = Math.max(1, state.page - 2);
+    var end = Math.min(state.totalPages, state.page + 2);
+    for (var i = start; i <= end; i++) {
+      html += '<button class="pagination-btn' + (i === state.page ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>';
+    }
+    html += '<button class="pagination-btn"' + (state.page === state.totalPages ? ' disabled' : '') + ' data-page="' + (state.page + 1) + '">Next →</button>';
+    html += '<span class="pagination-info">Page ' + state.page + ' of ' + state.totalPages + '</span>';
+    el.innerHTML = html;
+    Array.prototype.forEach.call(el.querySelectorAll('.pagination-btn[data-page]'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        state.page = parseInt(btn.getAttribute('data-page'), 10);
+        load();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  function emptyState(title, msg) {
+    return '<div class="empty-state">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      '<h3>' + K.util.escapeHTML(title) + '</h3><p>' + K.util.escapeHTML(msg) + '</p></div>';
+  }
+
+  var searchTimer;
+  document.getElementById('searchInput').addEventListener('input', function (e) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      state.q = e.target.value.trim();
+      state.page = 1;
+      load();
+    }, 350);
+  });
+  document.getElementById('sortFilter').addEventListener('change', function (e) {
+    state.sort = e.target.value;
+    state.page = 1;
+    load();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

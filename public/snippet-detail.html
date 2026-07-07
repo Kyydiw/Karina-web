@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snippet — Karina-MD Platform</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+
+<section class="page-hero" style="padding-bottom: 24px;">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="sep">/</span>
+      <a href="/snippets">Snippets</a><span class="sep">/</span>
+      <span id="bcTitle">Loading…</span>
+    </div>
+  </div>
+</section>
+
+<section class="section-sm" style="padding-top: 24px;">
+  <div class="container">
+    <div id="detailContainer">
+      <div class="skeleton-card" style="height: 300px;"></div>
+    </div>
+  </div>
+</section>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var K = window.Karina;
+  var path = window.location.pathname;
+  var idOrSlug = path.replace(/^\/snippets\//, '').replace(/\/$/, '');
+  if (!idOrSlug) {
+    window.location.href = '/snippets';
+    return;
+  }
+
+  function load() {
+    K.api('/snippets/' + encodeURIComponent(idOrSlug)).then(function (json) {
+      if (!json.success) throw new Error('Not found');
+      var s = json.data;
+      document.title = s.title + ' — Karina-MD Platform';
+      document.getElementById('bcTitle').textContent = s.title;
+
+      var tags = (s.tags || []).map(function (t) {
+        return '<span class="card-tag">' + K.util.escapeHTML(t) + '</span>';
+      }).join('');
+
+      var html = '<div class="detail-header fade-in">' +
+        '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 16px;">' +
+          '<span class="card-category">' + K.util.escapeHTML(s.language) + '</span>' +
+          (s.isFeatured ? '<span class="badge badge-featured">Featured</span>' : '') +
+        '</div>' +
+        '<h1>' + K.util.escapeHTML(s.title) + '</h1>' +
+        '<p style="font-size: 16px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">' + K.util.escapeHTML(s.description) + '</p>' +
+        '<div class="detail-meta">' +
+          '<span class="detail-meta-item">👁 ' + K.util.formatNumber(s.viewCount || 0) + ' views</span>' +
+          '<span class="detail-meta-item">📋 ' + K.util.formatNumber(s.copyCount || 0) + ' copies</span>' +
+          '<span class="detail-meta-item">by ' + K.util.escapeHTML(s.author || 'admin') + '</span>' +
+          '<span class="detail-meta-item">🕒 ' + K.util.formatRelative(s.createdAt) + '</span>' +
+        '</div>' +
+        (tags ? '<div class="card-tags" style="margin-top: 16px;">' + tags + '</div>' : '') +
+      '</div>' +
+      '<div class="detail-body">' +
+        '<div class="detail-main fade-in">' +
+          '<h3 style="font-size: 18px; font-weight: 700; color: var(--text-charcoal); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">' +
+            '<span>Code</span>' +
+            '<span style="font-size: 12px; color: var(--text-muted); font-weight: 500;">' + s.code.length + ' chars · ' + s.code.split('\n').length + ' lines</span>' +
+          '</h3>' +
+          '<div class="code-block-full">' +
+            '<button class="copy-btn" id="copyBtn">' +
+              '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
+              'Copy code' +
+            '</button>' +
+            '<pre>' + K.util.escapeHTML(s.code) + '</pre>' +
+          '</div>' +
+          '<div style="margin-top: 24px; padding: 16px; background: var(--bg-neutral); border-radius: var(--radius-sm); font-size: 13px; color: var(--text-muted);">' +
+            '<strong style="color: var(--text-charcoal);">Usage:</strong> Click "Copy code" above to copy this snippet to your clipboard. Paste it into your project file as needed.' +
+          '</div>' +
+        '</div>' +
+        '<aside class="detail-sidebar">' +
+          '<div class="sidebar-card">' +
+            '<h4>Actions</h4>' +
+            '<button class="btn btn-primary btn-block" id="copyBtn2" style="margin-bottom: 12px;">📋 Copy to clipboard</button>' +
+            '<a href="/snippets" class="btn btn-secondary btn-block">← All snippets</a>' +
+          '</div>' +
+          '<div class="sidebar-card">' +
+            '<h4>Stats</h4>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Views</span><span class="sidebar-stat-value">' + K.util.formatNumber(s.viewCount || 0) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Copies</span><span class="sidebar-stat-value">' + K.util.formatNumber(s.copyCount || 0) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Language</span><span class="sidebar-stat-value">' + K.util.escapeHTML(s.language) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Created</span><span class="sidebar-stat-value">' + K.util.formatDate(s.createdAt) + '</span></div>' +
+            '<div class="sidebar-stat"><span class="sidebar-stat-label">Updated</span><span class="sidebar-stat-value">' + K.util.formatDate(s.updatedAt) + '</span></div>' +
+          '</div>' +
+          '<div class="sidebar-card">' +
+            '<h4>Need help?</h4>' +
+            '<p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">If you have questions about this snippet, open a support ticket.</p>' +
+            '<a href="/support" class="btn btn-outline btn-block">Open Ticket</a>' +
+          '</div>' +
+        '</aside>' +
+      '</div>';
+
+      document.getElementById('detailContainer').innerHTML = html;
+
+      // Bind copy buttons
+      function bindCopy(btn) {
+        btn.addEventListener('click', function () {
+          K.util.copyToClipboard(s.code).then(function () {
+            btn.classList.add('copied');
+            var orig = btn.innerHTML;
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Copied!';
+            setTimeout(function () {
+              btn.classList.remove('copied');
+              btn.innerHTML = orig;
+            }, 1800);
+            K.api('/snippets/' + (s.slug || s._id) + '/copy', { method: 'POST' }).catch(function () {});
+            K.ui.toast('Snippet copied!', 'success', 1800);
+          }).catch(function () { K.ui.toast('Copy failed', 'error'); });
+        });
+      }
+      var c1 = document.getElementById('copyBtn');
+      var c2 = document.getElementById('copyBtn2');
+      if (c1) bindCopy(c1);
+      if (c2) bindCopy(c2);
+    }).catch(function () {
+      document.getElementById('detailContainer').innerHTML =
+        '<div class="empty-state">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+          '<h3>Snippet not found</h3>' +
+          '<p>This snippet may have been removed or never existed.</p>' +
+          '<a href="/snippets" class="btn btn-primary" style="margin-top: 16px;">← Back to snippets</a>' +
+        '</div>';
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

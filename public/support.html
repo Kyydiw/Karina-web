@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Support — Karina-MD Platform</title>
+<meta name="description" content="Open a support ticket or check the status of your existing tickets.">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="sep">/</span><span>Support</span>
+    </div>
+    <h1>Support Center</h1>
+    <p>Need help with a script, found a bug, or have a feature request? Open a ticket and our team will get back to you. Track all your tickets using your email address.</p>
+  </div>
+</section>
+
+<section class="section-sm">
+  <div class="container">
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="new">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Ticket
+      </button>
+      <button class="tab-btn" data-tab="mine">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        My Tickets
+      </button>
+    </div>
+
+    <!-- ===== NEW TICKET TAB ===== -->
+    <div class="tab-panel active" id="tab-new">
+      <div style="display: grid; grid-template-columns: 1fr 280px; gap: 32px; align-items: flex-start;">
+        <div class="detail-main" style="padding: 32px;">
+          <h3 style="font-size: 22px; font-weight: 700; margin-bottom: 8px;">Open a new support ticket</h3>
+          <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Fill in the form below. You'll receive a ticket number and an access token to view your ticket and reply.</p>
+          <form id="ticketForm" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="name">Your Name <span class="required">*</span></label>
+                <input class="form-input" type="text" id="name" placeholder="e.g. John Doe" maxlength="80" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="email">Email <span class="required">*</span></label>
+                <input class="form-input" type="email" id="email" placeholder="you@example.com" maxlength="120" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="whatsapp">WhatsApp (optional)</label>
+              <input class="form-input" type="text" id="whatsapp" placeholder="+62..." maxlength="30">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="subject">Subject <span class="required">*</span></label>
+              <input class="form-input" type="text" id="subject" placeholder="Brief summary of your issue" maxlength="200" required>
+            </div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label class="form-label" for="category">Category <span class="required">*</span></label>
+                <select id="category" class="form-select" required>
+                  <option value="general">General Inquiry</option>
+                  <option value="bug-report">Bug Report</option>
+                  <option value="feature-request">Feature Request</option>
+                  <option value="script-issue">Script Issue</option>
+                  <option value="account">Account Issue</option>
+                  <option value="billing">Billing</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="priority">Priority <span class="required">*</span></label>
+                <select id="priority" class="form-select" required>
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div class="form-group" style="display:flex; align-items:flex-end;">
+                <div style="font-size: 12px; color: var(--text-light); padding: 10px 0;">Avg response: 24h</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="description">Description <span class="required">*</span></label>
+              <textarea id="description" class="form-textarea" placeholder="Describe your issue in detail. Include error messages, steps to reproduce, and any other relevant information." maxlength="5000" required></textarea>
+              <div class="form-hint">Min 10 chars, max 5000 chars. <span id="charCount">0</span> / 5000</div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Submit Ticket
+            </button>
+          </form>
+        </div>
+        <aside style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="sidebar-card">
+            <h4>Response time</h4>
+            <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">Most tickets receive a first response within 24 hours. Urgent issues are prioritized.</p>
+          </div>
+          <div class="sidebar-card">
+            <h4>Before submitting</h4>
+            <ul style="font-size: 13px; color: var(--text-muted); padding-left: 18px; line-height: 1.7;">
+              <li>Check existing scripts and updates for known issues.</li>
+              <li>Include error messages and reproduction steps.</li>
+              <li>Mention the script name and version if relevant.</li>
+              <li>Provide a valid email — your access token is sent there.</li>
+            </ul>
+          </div>
+          <div class="sidebar-card">
+            <h4>Other channels</h4>
+            <a href="https://whatsapp.com/channel/0029Vb816qs6LwHheK1KT044" target="_blank" rel="noopener" class="btn btn-secondary btn-block" style="margin-bottom: 8px;">WhatsApp Channel</a>
+            <a href="https://wa.me/6283815201912" target="_blank" rel="noopener" class="btn btn-outline btn-block">Contact Directly</a>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ===== MY TICKETS TAB ===== -->
+    <div class="tab-panel" id="tab-mine">
+      <div class="detail-main" style="padding: 24px;">
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 24px;">
+          <div class="form-group" style="flex:1; min-width: 240px; margin: 0;">
+            <label class="form-label" for="myEmail">Enter your email to view your tickets</label>
+            <input class="form-input" type="email" id="myEmail" placeholder="you@example.com">
+          </div>
+          <button class="btn btn-primary" id="loadMyTicketsBtn">View Tickets</button>
+        </div>
+        <div id="myTicketsContainer">
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            <h3>Enter your email above</h3>
+            <p>We'll show all tickets you've submitted.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Success modal -->
+<div class="modal-overlay" id="successModal">
+  <div class="modal-box">
+    <div style="text-align: center; padding: 16px 0 24px;">
+      <div style="width: 64px; height: 64px; border-radius: 50%; background: #d1fae5; color: #065f46; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h2 class="modal-title" style="margin-bottom: 8px;">Ticket Submitted!</h2>
+      <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">Save your ticket number and access token below to view and reply to your ticket later.</p>
+    </div>
+    <div style="background: var(--bg-neutral); padding: 16px; border-radius: var(--radius-sm); margin-bottom: 16px;">
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-soft);">
+        <span style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Ticket Number</span>
+        <strong id="modalTicketNumber">—</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+        <span style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Access Token</span>
+        <code id="modalAccessToken" style="font-size: 12px; word-break: break-all; max-width: 60%; text-align: right;">—</code>
+      </div>
+    </div>
+    <div class="alert alert-warning" style="font-size: 13px;">⚠ Keep your access token safe — anyone with it can view and reply to your ticket.</div>
+    <a href="#" id="modalViewTicket" class="btn btn-primary btn-block" style="margin-top: 16px;">View My Ticket</a>
+    <button class="btn btn-secondary btn-block" id="modalCloseBtn" style="margin-top: 8px;">Close</button>
+  </div>
+</div>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var K = window.Karina;
+
+  // Tab switching
+  Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.getAttribute('data-tab')).classList.add('active');
+    });
+  });
+
+  // Char count
+  var desc = document.getElementById('description');
+  var cc = document.getElementById('charCount');
+  desc.addEventListener('input', function () { cc.textContent = desc.value.length; });
+
+  // Submit form
+  document.getElementById('ticketForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = document.getElementById('submitBtn');
+    var data = {
+      name: document.getElementById('name').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      whatsapp: document.getElementById('whatsapp').value.trim(),
+      subject: document.getElementById('subject').value.trim(),
+      category: document.getElementById('category').value,
+      priority: document.getElementById('priority').value,
+      description: document.getElementById('description').value.trim()
+    };
+
+    if (!data.name || !data.email || !data.subject || !data.description) {
+      K.ui.toast('Please fill in all required fields.', 'error');
+      return;
+    }
+    if (data.description.length < 10) {
+      K.ui.toast('Description must be at least 10 characters.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    K.api('/tickets/create', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }).then(function (json) {
+      if (json.success) {
+        document.getElementById('modalTicketNumber').textContent = json.data.ticketNumber;
+        document.getElementById('modalAccessToken').textContent = json.data.accessToken;
+        document.getElementById('modalViewTicket').href = '/support/ticket/' + json.data.ticketNumber + '?token=' + encodeURIComponent(json.data.accessToken);
+        document.getElementById('successModal').classList.add('active');
+        document.getElementById('ticketForm').reset();
+        cc.textContent = '0';
+        K.ui.toast('Ticket created successfully!', 'success');
+      } else {
+        K.ui.toast(json.message || 'Failed to create ticket.', 'error');
+      }
+    }).catch(function (err) {
+      K.ui.toast(err.message || 'Network error. Please try again.', 'error');
+    }).finally(function () {
+      btn.disabled = false;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Submit Ticket';
+    });
+  });
+
+  // Success modal close
+  document.getElementById('modalCloseBtn').addEventListener('click', function () {
+    document.getElementById('successModal').classList.remove('active');
+  });
+  document.getElementById('successModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+
+  // My tickets
+  document.getElementById('loadMyTicketsBtn').addEventListener('click', function () {
+    var email = document.getElementById('myEmail').value.trim();
+    if (!email) { K.ui.toast('Please enter your email.', 'warning'); return; }
+    loadMyTickets(email);
+  });
+  document.getElementById('myEmail').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      var email = document.getElementById('myEmail').value.trim();
+      if (email) loadMyTickets(email);
+    }
+  });
+
+  function loadMyTickets(email) {
+    var container = document.getElementById('myTicketsContainer');
+    container.innerHTML = '<div class="empty-state"><div class="loading-spinner"></div><p style="margin-top: 16px;">Loading your tickets...</p></div>';
+    K.api('/tickets/mine?email=' + encodeURIComponent(email)).then(function (json) {
+      if (!json.success) throw new Error('Failed');
+      if (json.data.length === 0) {
+        container.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><h3>No tickets found</h3><p>No tickets have been submitted from ' + K.util.escapeHTML(email) + '.</p></div>';
+        return;
+      }
+      container.innerHTML = '<div class="data-table-wrap" style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Ticket #</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>' +
+        json.data.map(function (t) {
+          return '<tr>' +
+            '<td><code style="font-size:12px;">' + K.util.escapeHTML(t.ticketNumber) + '</code></td>' +
+            '<td><strong>' + K.util.escapeHTML(t.subject) + '</strong></td>' +
+            '<td><span class="card-category">' + K.util.escapeHTML(t.category) + '</span></td>' +
+            '<td><span class="badge badge-' + t.priority + '">' + t.priority + '</span></td>' +
+            '<td><span class="badge badge-' + t.status + '">' + t.status + '</span></td>' +
+            '<td style="font-size: 12px; color: var(--text-muted);">' + K.util.formatRelative(t.createdAt) + '</td>' +
+            '<td style="text-align: right;"><button class="btn btn-sm btn-outline view-ticket" data-num="' + K.util.escapeHTML(t.ticketNumber) + '">View →</button></td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
+
+      // For viewing, prompt for access token since /mine doesn't return tokens
+      Array.prototype.forEach.call(document.querySelectorAll('.view-ticket'), function (btn) {
+        btn.addEventListener('click', function () {
+          var num = btn.getAttribute('data-num');
+          var token = prompt('Enter the access token for ticket ' + num + ':');
+          if (token) {
+            window.location.href = '/support/ticket/' + num + '?token=' + encodeURIComponent(token.trim());
+          }
+        });
+      });
+    }).catch(function () {
+      container.innerHTML = '<div class="empty-state"><h3>Failed to load</h3><p>Please check your email and try again.</p></div>';
+    });
+  }
+})();
+</script>
+</body>
+</html>

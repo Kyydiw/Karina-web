@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snippets — Karina-MD Platform</title>
+<meta name="description" content="Browse reusable JavaScript code snippets. Copy and paste directly into your project.">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/shared.css">
+</head>
+<body>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a><span class="sep">/</span><span>Snippets</span>
+    </div>
+    <h1>Code Snippets</h1>
+    <p>A curated collection of reusable JavaScript, TypeScript, and other code snippets. Each snippet is ready to copy and paste into your WhatsApp bot or any project.</p>
+  </div>
+</section>
+
+<section class="section-sm">
+  <div class="container">
+    <div class="filters-bar">
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" class="form-input" placeholder="Search snippets by title or description...">
+      </div>
+      <select id="languageFilter" class="filter-select">
+        <option value="">All languages</option>
+        <option value="javascript">JavaScript</option>
+        <option value="typescript">TypeScript</option>
+        <option value="json">JSON</option>
+        <option value="html">HTML</option>
+        <option value="css">CSS</option>
+        <option value="bash">Bash</option>
+        <option value="python">Python</option>
+        <option value="markdown">Markdown</option>
+      </select>
+      <select id="sortFilter" class="filter-select">
+        <option value="newest">Newest first</option>
+        <option value="popular">Most viewed</option>
+        <option value="copied">Most copied</option>
+        <option value="featured">Featured only</option>
+      </select>
+    </div>
+
+    <div class="cards-grid" id="snippetsGrid">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+</section>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  'use strict';
+  var K = window.Karina;
+  var state = { page: 1, perPage: 12, q: '', language: '', sort: 'newest', totalPages: 1, total: 0 };
+
+  function load() {
+    var grid = document.getElementById('snippetsGrid');
+    grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
+
+    var qs = '?page=' + state.page + '&perPage=' + state.perPage + '&sort=' + state.sort;
+    if (state.q) qs += '&q=' + encodeURIComponent(state.q);
+    if (state.language) qs += '&language=' + encodeURIComponent(state.language);
+
+    K.api('/snippets/list' + qs).then(function (json) {
+      if (!json.success) throw new Error('Failed');
+      state.total = json.data.total;
+      state.totalPages = json.data.totalPages;
+
+      if (json.data.items.length === 0) {
+        grid.innerHTML = emptyState('No snippets found', 'Try adjusting your search or filter, or check back later.');
+      } else {
+        grid.innerHTML = json.data.items.map(snippetCardHTML).join('');
+        bindCopyButtons();
+      }
+      renderPagination();
+    }).catch(function () {
+      grid.innerHTML = emptyState('Failed to load', 'Please check your connection and try again.');
+    });
+  }
+
+  function snippetCardHTML(s) {
+    var preview = (s.code || '').slice(0, 200);
+    var tags = (s.tags || []).slice(0, 3).map(function (t) {
+      return '<span class="card-tag">' + K.util.escapeHTML(t) + '</span>';
+    }).join('');
+    return '<article class="snippet-card fade-in">' +
+      '<a class="card-link-overlay" href="/snippets/' + (s.slug || s._id) + '" aria-label="' + K.util.escapeHTML(s.title) + '"></a>' +
+      '<div class="card-top">' +
+        '<span class="card-category">' + K.util.escapeHTML(s.language) + '</span>' +
+        (s.isFeatured ? '<span class="badge badge-featured">Featured</span>' : '') +
+      '</div>' +
+      '<h3>' + K.util.escapeHTML(s.title) + '</h3>' +
+      '<p class="card-desc" style="margin-bottom: 0;">' + K.util.escapeHTML(K.util.truncate(s.description, 100)) + '</p>' +
+      '<div class="code-preview" style="max-height: 140px;">' +
+        '<button class="copy-btn" data-snippet-id="' + s._id + '" data-code="' + encodeURIComponent(s.code || '') + '">' +
+          '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
+          'Copy' +
+        '</button>' +
+        '<pre>' + K.util.escapeHTML(preview) + (s.code && s.code.length > 200 ? '\n…' : '') + '</pre>' +
+      '</div>' +
+      (tags ? '<div class="card-tags">' + tags + '</div>' : '') +
+      '<div class="card-meta">' +
+        '<div class="card-meta-group">' +
+          '<span class="card-meta-item">👁 ' + K.util.formatNumber(s.viewCount || 0) + '</span>' +
+          '<span class="card-meta-item">📋 ' + K.util.formatNumber(s.copyCount || 0) + '</span>' +
+        '</div>' +
+        '<span class="card-meta-item">' + K.util.formatRelative(s.createdAt) + '</span>' +
+      '</div>' +
+    '</article>';
+  }
+
+  function bindCopyButtons() {
+    Array.prototype.forEach.call(document.querySelectorAll('.copy-btn[data-snippet-id]'), function (btn) {
+      if (btn._bound) return;
+      btn._bound = true;
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var code = decodeURIComponent(btn.getAttribute('data-code') || '');
+        K.util.copyToClipboard(code).then(function () {
+          btn.classList.add('copied');
+          btn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Copied!';
+          setTimeout(function () {
+            btn.classList.remove('copied');
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy';
+          }, 1800);
+          // Record copy count (fire and forget)
+          K.api('/snippets/' + btn.getAttribute('data-snippet-id') + '/copy', { method: 'POST' }).catch(function () {});
+          K.ui.toast('Snippet copied to clipboard', 'success', 1800);
+        }).catch(function () {
+          K.ui.toast('Failed to copy. Please copy manually.', 'error');
+        });
+      });
+    });
+  }
+
+  function renderPagination() {
+    var el = document.getElementById('pagination');
+    if (state.totalPages <= 1) {
+      el.innerHTML = '<span class="pagination-info">' + state.total + ' snippet' + (state.total === 1 ? '' : 's') + ' total</span>';
+      return;
+    }
+    var html = '';
+    html += '<button class="pagination-btn"' + (state.page === 1 ? ' disabled' : '') + ' data-page="' + (state.page - 1) + '">← Prev</button>';
+    var start = Math.max(1, state.page - 2);
+    var end = Math.min(state.totalPages, state.page + 2);
+    if (start > 1) {
+      html += '<button class="pagination-btn" data-page="1">1</button>';
+      if (start > 2) html += '<span class="pagination-info">…</span>';
+    }
+    for (var i = start; i <= end; i++) {
+      html += '<button class="pagination-btn' + (i === state.page ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>';
+    }
+    if (end < state.totalPages) {
+      if (end < state.totalPages - 1) html += '<span class="pagination-info">…</span>';
+      html += '<button class="pagination-btn" data-page="' + state.totalPages + '">' + state.totalPages + '</button>';
+    }
+    html += '<button class="pagination-btn"' + (state.page === state.totalPages ? ' disabled' : '') + ' data-page="' + (state.page + 1) + '">Next →</button>';
+    html += '<span class="pagination-info">Page ' + state.page + ' of ' + state.totalPages + '</span>';
+    el.innerHTML = html;
+    Array.prototype.forEach.call(el.querySelectorAll('.pagination-btn[data-page]'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        state.page = parseInt(btn.getAttribute('data-page'), 10);
+        load();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  function emptyState(title, msg) {
+    return '<div class="empty-state" style="grid-column: 1 / -1;">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      '<h3>' + K.util.escapeHTML(title) + '</h3><p>' + K.util.escapeHTML(msg) + '</p></div>';
+  }
+
+  var searchTimer;
+  document.getElementById('searchInput').addEventListener('input', function (e) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      state.q = e.target.value.trim();
+      state.page = 1;
+      load();
+    }, 350);
+  });
+  document.getElementById('sortFilter').addEventListener('change', function (e) {
+    state.sort = e.target.value;
+    state.page = 1;
+    load();
+  });
+  document.getElementById('languageFilter').addEventListener('change', function (e) {
+    state.language = e.target.value;
+    state.page = 1;
+    load();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

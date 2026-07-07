@@ -24,9 +24,44 @@
       "dest": "/public/js/$1"
     },
     {
+      "src": "/admin",
+      "dest": "/public/admin.html"
+    },
+    {
+      "src": "/downloads",
+      "dest": "/public/downloads.html"
+    },
+    {
+      "src": "/scripts",
+      "dest": "/public/scripts.html"
+    },
+    {
+      "src": "/script-detail",
+      "dest": "/public/script-detail.html"
+    },
+    {
+      "src": "/snippets",
+      "dest": "/public/snippets.html"
+    },
+    {
+      "src": "/snippet-detail",
+      "dest": "/public/snippet-detail.html"
+    },
+    {
+      "src": "/support",
+      "dest": "/public/support.html"
+    },
+    {
+      "src": "/ticket-detail",
+      "dest": "/public/ticket-detail.html"
+    },
+    {
+      "src": "/updates",
+      "dest": "/public/updates.html"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/public/$1",
-      "continue": true
+      "dest": "/public/$1"
     }
   ]
 }

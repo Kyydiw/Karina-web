@@ -3,7 +3,7 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
-const { authMiddleware, optionalAuth } = require('./middleware/auth');
+const { requireAuth, requireAdmin, optionalAuth } = require('./middleware/auth');
 const { authLimiter, ticketLimiter, replyLimiter, apiLimiter } = require('./middleware/rateLimiter');
 
 const authController = require('./controllers/authController');
@@ -19,7 +19,7 @@ const app = express();
 /*  Middleware                                                          */
 /* ------------------------------------------------------------------ */
 app.use(cookieParser());
-app.use(express.json({ limit: '6mb' }));         // allow large file content payloads
+app.use(express.json({ limit: '6mb' }));
 app.use(express.urlencoded({ extended: true, limit: '6mb' }));
 
 // General API rate limiting (applied to /api/* only)
@@ -32,7 +32,7 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.0.0'
+    version: '3.0.0'
   });
 });
 
@@ -43,7 +43,6 @@ app.use(async (req, res, next) => {
   try {
     const db = await connectDB();
 
-    // Register models on this connection so controllers can use db.model()
     const User = require('./models/User');
     const UpdateFile = require('./models/UpdateFile');
     const Script = require('./models/Script');
@@ -66,19 +65,21 @@ app.use(async (req, res, next) => {
 
 /* ------------------------------------------------------------------ */
 /*  Auth Routes                                                        */
+/*  - POST /api/auth/google  → Google Sign-In (Firebase)               */
+/*  - GET  /api/auth/check   → Verify internal JWT                    */
 /* ------------------------------------------------------------------ */
-app.post('/api/auth/login', authLimiter, authController.login);
-app.get('/api/auth/check', authMiddleware, authController.checkAuth);
+app.post('/api/auth/google', authLimiter, authController.googleLogin);
+app.get('/api/auth/check', requireAuth, authController.checkAuth);
 
 /* ------------------------------------------------------------------ */
-/*  Update Routes                                                      */
+/*  Update Routes (Admin only)                                         */
 /* ------------------------------------------------------------------ */
 app.get('/api/updates/latest', updateController.getLatestUpdates);
 app.get('/api/updates/all', updateController.getAllUpdates);
 app.get('/api/updates/:id', updateController.getUpdate);
-app.post('/api/updates/upload', authMiddleware, updateController.uploadUpdate);
-app.put('/api/updates/:id', authMiddleware, updateController.updateUpdate);
-app.delete('/api/updates/:id', authMiddleware, updateController.deleteUpdate);
+app.post('/api/updates/upload', requireAuth, requireAdmin, updateController.uploadUpdate);
+app.put('/api/updates/:id', requireAuth, requireAdmin, updateController.updateUpdate);
+app.delete('/api/updates/:id', requireAuth, requireAdmin, updateController.deleteUpdate);
 
 /* ------------------------------------------------------------------ */
 /*  Script Routes                                                      */
@@ -88,25 +89,38 @@ app.get('/api/scripts/featured', scriptController.getFeaturedScripts);
 app.get('/api/scripts/categories/counts', scriptController.getCategoryCounts);
 app.get('/api/scripts/:idOrSlug', scriptController.getScript);
 app.get('/api/scripts/:idOrSlug/download', scriptController.downloadScript);
-app.post('/api/scripts/create', authMiddleware, scriptController.createScript);
-app.put('/api/scripts/:id', authMiddleware, scriptController.updateScript);
-app.delete('/api/scripts/:id', authMiddleware, scriptController.deleteScript);
+app.post('/api/scripts/create', requireAuth, requireAdmin, scriptController.createScript);
+app.put('/api/scripts/:id', requireAuth, requireAdmin, scriptController.updateScript);
+app.delete('/api/scripts/:id', requireAuth, requireAdmin, scriptController.deleteScript);
 
 /* ------------------------------------------------------------------ */
 /*  Snippet Routes                                                     */
+/*  Perubahan:                                                         */
+/*  - POST /api/snippets        → requireAuth (user+admin bisa submit)  */
+/*  - PATCH /api/snippets/:id/approve → requireAdmin (approve/reject)   */
+/*  - PATCH /api/snippets/:id/reject  → requireAdmin                    */
+/*  - PUT/DELETE                  → requireAdmin (sama seperti sebelum)  */
 /* ------------------------------------------------------------------ */
 app.get('/api/snippets/list', snippetController.listSnippets);
 app.get('/api/snippets/featured', snippetController.getFeaturedSnippets);
 app.get('/api/snippets/:idOrSlug', snippetController.getSnippet);
 app.post('/api/snippets/:idOrSlug/copy', snippetController.recordCopy);
-app.post('/api/snippets/create', authMiddleware, snippetController.createSnippet);
-app.put('/api/snippets/:id', authMiddleware, snippetController.updateSnippet);
-app.delete('/api/snippets/:id', authMiddleware, snippetController.deleteSnippet);
+
+// Community submission: user biasa + admin bisa submit
+app.post('/api/snippets', requireAuth, snippetController.createSnippet);
+
+// Admin approval/rejection routes
+app.patch('/api/snippets/:id/approve', requireAuth, requireAdmin, snippetController.approveSnippet);
+app.patch('/api/snippets/:id/reject', requireAuth, requireAdmin, snippetController.rejectSnippet);
+
+// Admin CRUD (full control)
+app.put('/api/snippets/:id', requireAuth, requireAdmin, snippetController.updateSnippet);
+app.delete('/api/snippets/:id', requireAuth, requireAdmin, snippetController.deleteSnippet);
 
 /* ------------------------------------------------------------------ */
 /*  Ticket Routes                                                      */
 /*  - Public create + view (with access token)                        */
-/*  - Admin can view all and reply without token                      */
+/*  - Admin can view all and reply                                     */
 /* ------------------------------------------------------------------ */
 app.post('/api/tickets/create', ticketLimiter, ticketController.createTicket);
 app.get('/api/tickets/mine', ticketController.listMyTickets);
@@ -114,17 +128,17 @@ app.get('/api/tickets/:ticketNumber', optionalAuth, ticketController.getTicket);
 app.post('/api/tickets/:ticketNumber/reply', replyLimiter, optionalAuth, ticketController.replyTicket);
 
 // Admin-only ticket routes
-app.get('/api/tickets/admin/list', authMiddleware, ticketController.adminListTickets);
-app.put('/api/tickets/:ticketNumber/status', authMiddleware, ticketController.updateTicketStatus);
-app.delete('/api/tickets/:ticketNumber', authMiddleware, ticketController.deleteTicket);
+app.get('/api/tickets/admin/list', requireAuth, requireAdmin, ticketController.adminListTickets);
+app.put('/api/tickets/:ticketNumber/status', requireAuth, requireAdmin, ticketController.updateTicketStatus);
+app.delete('/api/tickets/:ticketNumber', requireAuth, requireAdmin, ticketController.deleteTicket);
 
 /* ------------------------------------------------------------------ */
 /*  Admin Dashboard Routes                                             */
 /* ------------------------------------------------------------------ */
-app.get('/api/admin/stats', authMiddleware, adminController.getStats);
-app.get('/api/admin/all-scripts', authMiddleware, adminController.listAllScripts);
-app.get('/api/admin/all-snippets', authMiddleware, adminController.listAllSnippets);
-app.get('/api/admin/all-updates', authMiddleware, adminController.listAllUpdates);
+app.get('/api/admin/stats', requireAuth, requireAdmin, adminController.getStats);
+app.get('/api/admin/all-scripts', requireAuth, requireAdmin, adminController.listAllScripts);
+app.get('/api/admin/all-snippets', requireAuth, requireAdmin, adminController.listAllSnippets);
+app.get('/api/admin/all-updates', requireAuth, requireAdmin, adminController.listAllUpdates);
 
 /* ------------------------------------------------------------------ */
 /*  404 Catch-all                                                      */

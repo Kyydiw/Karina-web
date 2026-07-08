@@ -3,8 +3,20 @@
 const { uniqueSlug } = require('../utils/helpers');
 
 /**
+ * Snippet Controller — Community Submission & Admin Approval
+ *
+ * Perubahan utama:
+ * - listSnippets: hanya menampilkan snippet dengan status='approved'.
+ * - createSnippet (POST /api/snippets): diproteksi requireAuth.
+ *   Jika user biasa → status='pending'. Jika admin → status='approved'.
+ * - approveSnippet (PATCH /api/snippets/:id/approve): diproteksi requireAdmin.
+ *   Mengubah status snippet dari 'pending' menjadi 'approved'.
+ * - getSnippet: hanya menampilkan snippet approved (atau milik user sendiri).
+ */
+
+/**
  * GET /api/snippets/list
- * Public. Returns paginated, searchable list of published snippets.
+ * Public. Returns paginated, searchable list of APPROVED snippets only.
  *
  * Query params:
  *   page, perPage, q, language, tag, sort ('newest'|'popular'|'featured')
@@ -21,7 +33,8 @@ async function listSnippets(req, res) {
     const tag = (req.query.tag || '').trim();
     const sortKey = (req.query.sort || 'newest').toLowerCase();
 
-    const filter = { isPublished: true };
+    // Hanya tampilkan snippet yang approved
+    const filter = { status: 'approved' };
     if (language) filter.language = language;
     if (tag) filter.tags = { $regex: '^' + escapeRegex(tag) + '$', $options: 'i' };
     if (q) filter.$text = { $search: q };
@@ -63,14 +76,14 @@ async function listSnippets(req, res) {
 
 /**
  * GET /api/snippets/featured
- * Public. Returns up to `limit` featured snippets (default 6).
+ * Public. Returns up to `limit` featured & approved snippets (default 6).
  */
 async function getFeaturedSnippets(req, res) {
   try {
     const db = req.app.get('db');
     const Snippet = db.model('Snippet');
     const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 6));
-    const items = await Snippet.find({ isPublished: true, isFeatured: true })
+    const items = await Snippet.find({ status: 'approved', isFeatured: true })
       .sort({ createdAt: -1 })
       .limit(limit)
       .select('-__v')
@@ -84,7 +97,7 @@ async function getFeaturedSnippets(req, res) {
 
 /**
  * GET /api/snippets/:idOrSlug
- * Public. Fetch a single snippet by id or slug. Increments view count.
+ * Public. Fetch a single APPROVED snippet by id or slug. Increments view count.
  */
 async function getSnippet(req, res) {
   try {
@@ -93,14 +106,15 @@ async function getSnippet(req, res) {
     const idOrSlug = req.params.idOrSlug;
 
     const query = idOrSlug.match(/^[0-9a-fA-F]{24}$/)
-      ? { _id: idOrSlug, isPublished: true }
-      : { slug: idOrSlug.toLowerCase(), isPublished: true };
+      ? { _id: idOrSlug, status: 'approved' }
+      : { slug: idOrSlug.toLowerCase(), status: 'approved' };
 
     const snippet = await Snippet.findOne(query).select('-__v').lean();
     if (!snippet) {
       return res.status(404).json({ success: false, message: 'Snippet not found.' });
     }
 
+    // Fire-and-forget view count increment
     Snippet.updateOne({ _id: snippet._id }, { $inc: { viewCount: 1 } }).catch(function () {});
 
     return res.status(200).json({ success: true, data: snippet });
@@ -136,8 +150,12 @@ async function recordCopy(req, res) {
 }
 
 /**
- * POST /api/snippets/create
- * Admin only. Creates a new snippet.
+ * POST /api/snippets
+ * Authenticated users (user OR admin). Community snippet submission.
+ *
+ * Perbedaan behavior berdasarkan role:
+ * - role='user'   → status='pending', isPublished=false, isFeatured=false.
+ * - role='admin'  → status='approved', isPublished=true (sama seperti sebelumnya).
  */
 async function createSnippet(req, res) {
   try {
@@ -169,6 +187,12 @@ async function createSnippet(req, res) {
     if (typeof tags === 'string') tags = tags.split(',').map(function (t) { return t.trim(); }).filter(Boolean);
     tags = tags.slice(0, 15);
 
+    // Tentukan status berdasarkan role user
+    var isAdmin = req.user && req.user.role === 'admin';
+    var snippetStatus = isAdmin ? 'approved' : 'pending';
+
+    var authorName = (req.user && req.user.displayName) || 'anonymous';
+
     const snippet = await Snippet.create({
       title: title,
       slug: slug,
@@ -176,19 +200,103 @@ async function createSnippet(req, res) {
       language: language,
       code: code,
       tags: tags,
-      author: req.user.username,
-      isFeatured: !!body.isFeatured,
-      isPublished: body.isPublished === false ? false : true
+      author: authorName,
+      isFeatured: isAdmin ? !!body.isFeatured : false,
+      isPublished: isAdmin ? (body.isPublished === false ? false : true) : false,
+      status: snippetStatus,
+      submittedBy: (req.user && req.user.id) || null
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Snippet created successfully.',
-      data: { id: snippet._id, slug: snippet.slug, title: snippet.title }
+      message: isAdmin
+        ? 'Snippet created and published successfully.'
+        : 'Snippet submitted for review. It will appear after admin approval.',
+      data: {
+        id: snippet._id,
+        slug: snippet.slug,
+        title: snippet.title,
+        status: snippet.status
+      }
     });
   } catch (error) {
     console.error('[Snippets] Create error:', error.message);
     return res.status(500).json({ success: false, message: 'Failed to create snippet.' });
+  }
+}
+
+/**
+ * PATCH /api/snippets/:id/approve
+ * Admin only. Mengubah status snippet dari 'pending' menjadi 'approved'.
+ */
+async function approveSnippet(req, res) {
+  try {
+    const db = req.app.get('db');
+    const Snippet = db.model('Snippet');
+    const id = req.params.id;
+
+    const snippet = await Snippet.findById(id);
+    if (!snippet) {
+      return res.status(404).json({ success: false, message: 'Snippet not found.' });
+    }
+
+    if (snippet.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Snippet is already approved.'
+      });
+    }
+
+    snippet.status = 'approved';
+    snippet.isPublished = true;
+    await snippet.save();
+
+    console.log('[Snippets] Snippet approved:', snippet.title, '| by admin:', req.user.email);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Snippet approved and published.',
+      data: { id: snippet._id, slug: snippet.slug, status: 'approved' }
+    });
+  } catch (error) {
+    console.error('[Snippets] Approve error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to approve snippet.' });
+  }
+}
+
+/**
+ * PATCH /api/snippets/:id/reject
+ * Admin only. Menolak snippet (soft-delete: set isPublished=false, status tetap pending).
+ * Bisa diubah ke hard delete via query ?hard=1.
+ */
+async function rejectSnippet(req, res) {
+  try {
+    const db = req.app.get('db');
+    const Snippet = db.model('Snippet');
+    const id = req.params.id;
+    const hard = req.query.hard === '1' || req.query.hard === 'true';
+
+    const snippet = await Snippet.findById(id);
+    if (!snippet) {
+      return res.status(404).json({ success: false, message: 'Snippet not found.' });
+    }
+
+    if (hard) {
+      await Snippet.deleteOne({ _id: id });
+      return res.status(200).json({ success: true, message: 'Snippet permanently deleted.' });
+    }
+
+    snippet.isPublished = false;
+    snippet.status = 'pending';
+    await snippet.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Snippet rejected (unpublished).'
+    });
+  } catch (error) {
+    console.error('[Snippets] Reject error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to reject snippet.' });
   }
 }
 
@@ -223,6 +331,12 @@ async function updateSnippet(req, res) {
       snippet.tags = body.tags.slice(0, 15);
     } else if (typeof body.tags === 'string') {
       snippet.tags = body.tags.split(',').map(function (t) { return t.trim(); }).filter(Boolean).slice(0, 15);
+    }
+
+    // Jika admin mengubah status manual via update
+    if (body.status && ['pending', 'approved'].indexOf(body.status) !== -1) {
+      snippet.status = body.status;
+      if (body.status === 'approved') snippet.isPublished = true;
     }
 
     if (body.title && body.title.trim() !== snippet.title) {
@@ -285,5 +399,7 @@ module.exports = {
   recordCopy,
   createSnippet,
   updateSnippet,
-  deleteSnippet
+  deleteSnippet,
+  approveSnippet,
+  rejectSnippet
 };

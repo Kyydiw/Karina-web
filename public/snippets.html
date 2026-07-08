@@ -4,9 +4,28 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Snippets — Karina-MD Platform</title>
-<meta name="description" content="Browse reusable JavaScript code snippets. Copy and paste directly into your project.">
+<meta name="description" content="Browse and submit reusable code snippets. Community-driven collection for your projects.">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/shared.css">
+
+<!--
+  Firebase Client SDK (Compat bundle v10).
+  Ganti ?config=... dengan YOUR_WEB_APP_ID dari Firebase Console.
+  Format: https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js
+  SDK akan di-inisialisasi oleh shared.js menggunakan window.__FIREBASE_*__ vars.
+-->
+<script>
+  // Set config dari environment atau hardcoded. Di Vercel, lebih baik inject via vercel.json rewrites
+  // atau hardcoded di sini untuk production simplicity.
+  window.__FIREBASE_API_KEY__ = '';              // TODO: Isi dari Firebase Console
+  window.__FIREBASE_AUTH_DOMAIN__ = '';          // TODO: your-project.firebaseapp.com
+  window.__FIREBASE_PROJECT_ID__ = '';           // TODO: your-project-id
+  window.__FIREBASE_STORAGE_BUCKET__ = '';       // TODO: your-project.appspot.com
+  window.__FIREBASE_MESSAGING_SENDER_ID__ = '';  // TODO: 123456789
+  window.__FIREBASE_APP_ID__ = '';               // TODO: 1:123456789:web:abcdef
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -16,12 +35,70 @@
       <a href="/">Home</a><span class="sep">/</span><span>Snippets</span>
     </div>
     <h1>Code Snippets</h1>
-    <p>A curated collection of reusable JavaScript, TypeScript, and other code snippets. Each snippet is ready to copy and paste into your WhatsApp bot or any project.</p>
+    <p>A curated collection of reusable code snippets from the community. Submit your own snippets and they'll appear here after approval.</p>
   </div>
 </section>
 
 <section class="section-sm">
   <div class="container">
+    <!-- Submit Snippet Button (only visible when logged in) -->
+    <div id="submitSnippetSection" style="display:none; margin-bottom: 24px;">
+      <button class="btn btn-primary" id="btnOpenSubmitForm">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Submit a Snippet
+      </button>
+    </div>
+
+    <!-- Submit Snippet Form (hidden by default) -->
+    <div class="modal-overlay" id="submitSnippetModal">
+      <div class="modal-box" style="max-width: 640px;">
+        <button class="modal-close-btn" id="submitFormCloseBtn" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <h2 class="modal-title">Submit a Snippet</h2>
+        <p class="modal-subtitle">Share your code with the community. Approved snippets will appear on this page.</p>
+        <form id="snippetSubmitForm" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="snippetTitle">Title <span class="required">*</span></label>
+            <input class="form-input" type="text" id="snippetTitle" placeholder="e.g. Retry function with exponential backoff" maxlength="140" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="snippetDescription">Description <span class="required">*</span></label>
+            <textarea id="snippetDescription" class="form-textarea" placeholder="Briefly describe what this snippet does and when to use it." maxlength="2000" required style="min-height: 80px;"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="snippetLanguage">Language <span class="required">*</span></label>
+              <select id="snippetLanguage" class="form-select" required>
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="json">JSON</option>
+                <option value="html">HTML</option>
+                <option value="css">CSS</option>
+                <option value="bash">Bash</option>
+                <option value="python">Python</option>
+                <option value="markdown">Markdown</option>
+                <option value="plaintext">Plaintext</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="snippetTags">Tags (comma-separated)</label>
+              <input class="form-input" type="text" id="snippetTags" placeholder="e.g. async, error-handling, utility" maxlength="200">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="snippetCode">Code <span class="required">*</span></label>
+            <textarea id="snippetCode" class="form-textarea code-textarea" placeholder="Paste your code here..." maxlength="50000" required style="min-height: 200px; font-family: 'Courier New', monospace; font-size: 13px; tab-size: 2;"></textarea>
+            <div class="form-hint"><span id="snippetCodeCount">0</span> / 50,000 characters</div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="snippetSubmitBtn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Submit for Review
+          </button>
+        </form>
+      </div>
+    </div>
+
     <div class="filters-bar">
       <div class="search-input-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -64,6 +141,17 @@
   var K = window.Karina;
   var state = { page: 1, perPage: 12, q: '', language: '', sort: 'newest', totalPages: 1, total: 0 };
 
+  /* ---------- Show/hide submit button based on auth ---------- */
+  function updateSubmitSection() {
+    var section = document.getElementById('submitSnippetSection');
+    if (K.auth.isLoggedIn()) {
+      section.style.display = '';
+    } else {
+      section.style.display = 'none';
+    }
+  }
+
+  /* ---------- Load approved snippets ---------- */
   function load() {
     var grid = document.getElementById('snippetsGrid');
     grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
@@ -78,7 +166,7 @@
       state.totalPages = json.data.totalPages;
 
       if (json.data.items.length === 0) {
-        grid.innerHTML = emptyState('No snippets found', 'Try adjusting your search or filter, or check back later.');
+        grid.innerHTML = emptyState('No snippets found', 'Try adjusting your search or filter, or be the first to submit one!');
       } else {
         grid.innerHTML = json.data.items.map(snippetCardHTML).join('');
         bindCopyButtons();
@@ -107,13 +195,13 @@
           '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
           'Copy' +
         '</button>' +
-        '<pre>' + K.util.escapeHTML(preview) + (s.code && s.code.length > 200 ? '\n…' : '') + '</pre>' +
+        '<pre>' + K.util.escapeHTML(preview) + (s.code && s.code.length > 200 ? '\n\u2026' : '') + '</pre>' +
       '</div>' +
       (tags ? '<div class="card-tags">' + tags + '</div>' : '') +
       '<div class="card-meta">' +
         '<div class="card-meta-group">' +
-          '<span class="card-meta-item">👁 ' + K.util.formatNumber(s.viewCount || 0) + '</span>' +
-          '<span class="card-meta-item">📋 ' + K.util.formatNumber(s.copyCount || 0) + '</span>' +
+          '<span class="card-meta-item">\uD83D\uDC41 ' + K.util.formatNumber(s.viewCount || 0) + '</span>' +
+          '<span class="card-meta-item">\uD83D\uDCCB ' + K.util.formatNumber(s.copyCount || 0) + '</span>' +
         '</div>' +
         '<span class="card-meta-item">' + K.util.formatRelative(s.createdAt) + '</span>' +
       '</div>' +
@@ -135,7 +223,6 @@
             btn.classList.remove('copied');
             btn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy';
           }, 1800);
-          // Record copy count (fire and forget)
           K.api('/snippets/' + btn.getAttribute('data-snippet-id') + '/copy', { method: 'POST' }).catch(function () {});
           K.ui.toast('Snippet copied to clipboard', 'success', 1800);
         }).catch(function () {
@@ -152,21 +239,21 @@
       return;
     }
     var html = '';
-    html += '<button class="pagination-btn"' + (state.page === 1 ? ' disabled' : '') + ' data-page="' + (state.page - 1) + '">← Prev</button>';
+    html += '<button class="pagination-btn"' + (state.page === 1 ? ' disabled' : '') + ' data-page="' + (state.page - 1) + '">\u2190 Prev</button>';
     var start = Math.max(1, state.page - 2);
     var end = Math.min(state.totalPages, state.page + 2);
     if (start > 1) {
       html += '<button class="pagination-btn" data-page="1">1</button>';
-      if (start > 2) html += '<span class="pagination-info">…</span>';
+      if (start > 2) html += '<span class="pagination-info">\u2026</span>';
     }
     for (var i = start; i <= end; i++) {
       html += '<button class="pagination-btn' + (i === state.page ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>';
     }
     if (end < state.totalPages) {
-      if (end < state.totalPages - 1) html += '<span class="pagination-info">…</span>';
+      if (end < state.totalPages - 1) html += '<span class="pagination-info">\u2026</span>';
       html += '<button class="pagination-btn" data-page="' + state.totalPages + '">' + state.totalPages + '</button>';
     }
-    html += '<button class="pagination-btn"' + (state.page === state.totalPages ? ' disabled' : '') + ' data-page="' + (state.page + 1) + '">Next →</button>';
+    html += '<button class="pagination-btn"' + (state.page === state.totalPages ? ' disabled' : '') + ' data-page="' + (state.page + 1) + '">Next \u2192</button>';
     html += '<span class="pagination-info">Page ' + state.page + ' of ' + state.totalPages + '</span>';
     el.innerHTML = html;
     Array.prototype.forEach.call(el.querySelectorAll('.pagination-btn[data-page]'), function (btn) {
@@ -185,6 +272,97 @@
       '<h3>' + K.util.escapeHTML(title) + '</h3><p>' + K.util.escapeHTML(msg) + '</p></div>';
   }
 
+  /* ---------- Submit Snippet Form Logic ---------- */
+  function setupSubmitForm() {
+    var openBtn = document.getElementById('btnOpenSubmitForm');
+    var modal = document.getElementById('submitSnippetModal');
+    var closeBtn = document.getElementById('submitFormCloseBtn');
+    var form = document.getElementById('snippetSubmitForm');
+    var codeArea = document.getElementById('snippetCode');
+    var codeCount = document.getElementById('snippetCodeCount');
+
+    if (openBtn) {
+      openBtn.addEventListener('click', function () {
+        modal.classList.add('active');
+      });
+    }
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        modal.classList.remove('active');
+      });
+    }
+    if (modal) {
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) modal.classList.remove('active');
+      });
+    }
+
+    // Character count for code
+    if (codeArea && codeCount) {
+      codeArea.addEventListener('input', function () {
+        codeCount.textContent = codeArea.value.length;
+      });
+    }
+
+    // Form submit
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var btn = document.getElementById('snippetSubmitBtn');
+
+        var title = document.getElementById('snippetTitle').value.trim();
+        var description = document.getElementById('snippetDescription').value.trim();
+        var language = document.getElementById('snippetLanguage').value;
+        var tags = document.getElementById('snippetTags').value.trim();
+        var code = document.getElementById('snippetCode').value;
+
+        if (!title || !description || !code) {
+          K.ui.toast('Title, description, and code are required.', 'error');
+          return;
+        }
+        if (code.length > 50000) {
+          K.ui.toast('Code exceeds 50,000 character limit.', 'error');
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+
+        var payload = { title: title, description: description, language: language, code: code };
+        if (tags) payload.tags = tags;
+
+        K.api('/snippets', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        }).then(function (json) {
+          if (json.success) {
+            modal.classList.remove('active');
+            form.reset();
+            codeCount.textContent = '0';
+            if (json.data.status === 'pending') {
+              K.ui.toast('Snippet submitted! It will appear after admin approval.', 'success', 5000);
+            } else {
+              K.ui.toast('Snippet created successfully!', 'success');
+            }
+            load(); // Refresh list (admin snippet would show immediately)
+          } else {
+            K.ui.toast(json.message || 'Failed to submit snippet.', 'error');
+          }
+        }).catch(function (err) {
+          if (err.status === 401) {
+            K.ui.toast('Please sign in to submit snippets.', 'warning');
+          } else {
+            K.ui.toast(err.message || 'Network error. Please try again.', 'error');
+          }
+        }).finally(function () {
+          btn.disabled = false;
+          btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Submit for Review';
+        });
+      });
+    }
+  }
+
+  /* ---------- Filter events ---------- */
   var searchTimer;
   document.getElementById('searchInput').addEventListener('input', function (e) {
     clearTimeout(searchTimer);
@@ -205,7 +383,20 @@
     load();
   });
 
+  /* ---------- Init ---------- */
+  // Tunggu auth state siap (shared.js DOMContentLoaded sudah jalan sebelum ini)
+  updateSubmitSection();
+  setupSubmitForm();
   load();
+
+  // Update submit section setiap kali auth state berubah (observer pattern via polling sederhana)
+  var _lastAuthState = K.auth.state.isAuthenticated;
+  setInterval(function () {
+    if (K.auth.state.isAuthenticated !== _lastAuthState) {
+      _lastAuthState = K.auth.state.isAuthenticated;
+      updateSubmitSection();
+    }
+  }, 500);
 })();
 </script>
 </body>

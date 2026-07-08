@@ -1,8 +1,8 @@
 /* ============================================================
    Karina-MD Platform — Shared JS utilities
-   Provides: API client, auth state, toast notifications,
-   navbar injection, footer injection, date formatting,
-   escape HTML, query string parsing.
+   Provides: Firebase Client SDK init, Google Sign-In, API client,
+   auth state, toast notifications, state-aware navbar injection,
+   footer injection, date formatting, escape HTML, query string parsing.
    ============================================================ */
 (function (window) {
   'use strict';
@@ -10,6 +10,61 @@
   var API_BASE = '/api';
   var TOKEN_KEY = 'karina_token';
   var USER_KEY = 'karina_user';
+
+  /* ---------- Firebase Config ---------- */
+  // Ganti nilai ini dengan konfigurasi Firebase project Anda.
+  // Diperoleh dari: Firebase Console > Project Settings > General > Your apps > Web app.
+  var FIREBASE_CONFIG = {
+    apiKey: window.__FIREBASE_API_KEY__ || '',
+    authDomain: window.__FIREBASE_AUTH_DOMAIN__ || '',
+    projectId: window.__FIREBASE_PROJECT_ID__ || '',
+    storageBucket: window.__FIREBASE_STORAGE_BUCKET__ || '',
+    messagingSenderId: window.__FIREBASE_MESSAGING_SENDER_ID__ || '',
+    appId: window.__FIREBASE_APP_ID__ || ''
+  };
+
+  /* ---------- Firebase SDK references ---------- */
+  var _firebaseAuth = null;
+  var _googleProvider = null;
+  var _firebaseReady = false;
+
+  /**
+   * Lazy-init Firebase Client SDK (v10 Modular style via CDN compat).
+   * SDK dimuat dari CDN di HTML. Fungsi ini membuat instance Auth & GoogleAuthProvider.
+   */
+  function initFirebase() {
+    if (_firebaseReady) return true;
+
+    try {
+      // Firebase v10 Modular: kita gunakan global `firebase` namespace dari compat bundle
+      // yang dimuat via <script> tag di setiap halaman.
+      if (typeof firebase === 'undefined') {
+        console.warn('[Karina] Firebase SDK not loaded. Google Sign-In will be unavailable.');
+        return false;
+      }
+
+      if (!firebase.apps || firebase.apps.length === 0) {
+        if (!FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.projectId) {
+          console.warn('[Karina] Firebase config missing. Google Sign-In will be unavailable.');
+          return false;
+        }
+        firebase.initializeApp(FIREBASE_CONFIG);
+      }
+
+      _firebaseAuth = firebase.auth();
+      _googleProvider = new firebase.auth.GoogleAuthProvider();
+      // Scope tambahan untuk mendapatkan foto profil
+      _googleProvider.addScope('profile');
+      _googleProvider.addScope('email');
+
+      _firebaseReady = true;
+      console.log('[Karina] Firebase Client SDK initialized.');
+      return true;
+    } catch (err) {
+      console.error('[Karina] Firebase init error:', err.message);
+      return false;
+    }
+  }
 
   /* ---------- Token storage ---------- */
   function getToken() {
@@ -73,6 +128,10 @@
   /* ---------- Auth state ---------- */
   var authState = { isAuthenticated: false, user: null };
 
+  /**
+   * refreshAuthState — Verifikasi token internal ke backend dan update state.
+   * Jika token expired/invalid, clear localStorage.
+   */
   function refreshAuthState() {
     return api('/auth/check').then(function (json) {
       if (json.success && json.data) {
@@ -93,24 +152,52 @@
     });
   }
 
-  function login(username, password) {
-    return api('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username: username, password: password })
-    }).then(function (json) {
-      if (json.success) {
-        setToken(json.data.token, { id: json.data.username, username: json.data.username });
-        authState.isAuthenticated = true;
-        authState.user = { id: json.data.username, username: json.data.username };
-      }
-      return json;
-    });
+  /**
+   * googleSignIn — Memulai Google Sign-In popup via Firebase Client SDK.
+   * Setelah berhasil, kirim idToken ke backend /api/auth/google.
+   * Backend mengembalikan JWT internal yang disimpan ke localStorage.
+   */
+  function googleSignIn() {
+    if (!initFirebase()) {
+      toast('Google Sign-In is not available. Firebase SDK is not configured.', 'error');
+      return Promise.reject(new Error('Firebase not configured'));
+    }
+
+    return _firebaseAuth.signInWithPopup(_googleProvider)
+      .then(function (result) {
+        // Dapatkan idToken dari credential
+        return result.user.getIdToken();
+      })
+      .then(function (idToken) {
+        // Kirim idToken ke backend
+        return api('/auth/google', {
+          method: 'POST',
+          body: JSON.stringify({ idToken: idToken })
+        });
+      })
+      .then(function (json) {
+        if (json.success) {
+          setToken(json.data.token, json.data.user);
+          authState.isAuthenticated = true;
+          authState.user = json.data.user;
+        }
+        return json;
+      });
   }
 
+  /**
+   * logout — Sign out dari Firebase & clear token lokal.
+   */
   function logout() {
+    // Sign out dari Firebase (fire-and-forget)
+    if (_firebaseReady && _firebaseAuth) {
+      _firebaseAuth.signOut().catch(function () {});
+    }
     removeToken();
     authState.isAuthenticated = false;
     authState.user = null;
+    // Update UI immediately
+    updateAuthUI();
   }
 
   /* ---------- Toast notifications ---------- */
@@ -209,7 +296,7 @@
   function truncate(str, max) {
     if (!str) return '';
     if (str.length <= max) return str;
-    return str.slice(0, max).trim() + '…';
+    return str.slice(0, max).trim() + '\u2026';
   }
 
   function copyToClipboard(text) {
@@ -231,15 +318,51 @@
     });
   }
 
-  /* ---------- Navbar injection ---------- */
-  var NAV_LINKS = [
-    { href: '/', label: 'Home', key: 'home' },
-    { href: '/scripts', label: 'Scripts', key: 'scripts' },
-    { href: '/snippets', label: 'Snippets', key: 'snippets' },
-    { href: '/downloads', label: 'Downloads', key: 'downloads' },
-    { href: '/updates', label: 'Updates', key: 'updates' },
-    { href: '/support', label: 'Support', key: 'support' }
-  ];
+  /* =========================================================================
+     STATE-AWARE NAVBAR
+     =========================================================================
+
+     Tiga state yang didukung:
+
+     1. BELUM LOGIN (guest):
+        Menu: [Home, Projects, Snippets, Downloads]
+        Tombol: [Login dengan Google]
+        Hidden: [Support Ticket], [Admin Panel], [Foto Profil], [Logout]
+
+     2. LOGIN SEBAGAI USER BIASA:
+        Menu: [Home, Projects, Snippets, Downloads, Support Ticket]
+        Hidden: [Admin Panel]
+        Visible: [Foto Profil Google User] + [Logout]
+
+     3. LOGIN SEBAGAI ADMIN:
+        Menu: [Home, Projects, Snippets, Downloads, Support Ticket, Admin Panel]
+        Visible: [Foto Profil Google User] + [Logout]
+
+     ========================================================================= */
+
+  /**
+   * getNavLinks — Mengembalikan daftar link berdasarkan auth state.
+   */
+  function getNavLinks() {
+    var base = [
+      { href: '/', label: 'Home', key: 'home' },
+      { href: '/scripts', label: 'Projects', key: 'scripts' },
+      { href: '/snippets', label: 'Snippets', key: 'snippets' },
+      { href: '/downloads', label: 'Downloads', key: 'downloads' }
+    ];
+
+    // Support Ticket hanya muncul jika sudah login
+    if (authState.isAuthenticated) {
+      base.push({ href: '/support', label: 'Support Ticket', key: 'support' });
+    }
+
+    // Admin Panel hanya muncul jika role === 'admin'
+    if (authState.isAuthenticated && authState.user && authState.user.role === 'admin') {
+      base.push({ href: '/admin', label: 'Admin Panel', key: 'admin' });
+    }
+
+    return base;
+  }
 
   function getCurrentNavKey() {
     var p = window.location.pathname;
@@ -254,10 +377,60 @@
   }
 
   function buildNavbar() {
+    // Init Firebase saat navbar dibangun
+    initFirebase();
+
     var key = getCurrentNavKey();
-    var linksHtml = NAV_LINKS.map(function (l) {
+    var links = getNavLinks();
+
+    var linksHtml = links.map(function (l) {
       return '<a href="' + l.href + '" class="nav-link' + (l.key === key ? ' active' : '') + '">' + l.label + '</a>';
     }).join('');
+
+    var userPhotoUrl = '';
+    var userDisplayName = '';
+    var userRole = '';
+    if (authState.isAuthenticated && authState.user) {
+      userPhotoUrl = authState.user.photoURL || '';
+      userDisplayName = authState.user.displayName || 'User';
+      userRole = authState.user.role || 'user';
+    }
+
+    // Profile avatar HTML (hanya ditampilkan jika sudah login)
+    var profileHtml = '';
+    if (authState.isAuthenticated) {
+      var avatarInner = '';
+      if (userPhotoUrl) {
+        avatarInner = '<img src="' + escapeHTML(userPhotoUrl) + '" alt="' + escapeHTML(userDisplayName) + '" class="nav-avatar-img">';
+      } else {
+        avatarInner = '<span class="nav-avatar-initial">' + escapeHTML(userDisplayName.charAt(0).toUpperCase()) + '</span>';
+      }
+      profileHtml =
+        '<div class="nav-profile" id="navProfile">' +
+          avatarInner +
+          '<span class="nav-profile-name">' + escapeHTML(userDisplayName) + '</span>' +
+          (userRole === 'admin' ? '<span class="nav-role-badge">Admin</span>' : '') +
+          '<div class="nav-profile-dropdown" id="navProfileDropdown">' +
+            '<div class="nav-dropdown-item nav-dropdown-info">' +
+              (userPhotoUrl ? '<img src="' + escapeHTML(userPhotoUrl) + '" alt="" class="nav-dropdown-avatar">' : '') +
+              '<div><strong>' + escapeHTML(userDisplayName) + '</strong><small>' + escapeHTML(authState.user.email || '') + '</small></div>' +
+            '</div>' +
+            '<button class="nav-dropdown-item" id="btnLogout">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>' +
+              'Sign Out' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    // Login button (hanya ditampilkan jika BELUM login)
+    var loginBtnHtml = '';
+    if (!authState.isAuthenticated) {
+      loginBtnHtml = '<button class="btn-login btn-google-login" id="btnGoogleLogin">' +
+        '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>' +
+        'Login dengan Google' +
+      '</button>';
+    }
 
     var html =
       '<nav class="navbar">' +
@@ -275,23 +448,20 @@
                 '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>' +
               '</svg>' +
             '</button>' +
-            '<span class="nav-user-badge" id="navUserBadge">' +
-              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' +
-              '</svg>' +
-              '<span id="navUsername"></span>' +
-            '</span>' +
-            '<a href="#" class="btn-login" id="btnLogin">Log in</a>' +
-            '<a href="/admin" class="btn-signup" id="btnAdmin" style="display:none;">Admin Panel</a>' +
+            loginBtnHtml +
+            profileHtml +
           '</div>' +
         '</div>' +
       '</nav>' +
       '<div class="drawer-backdrop" id="drawerBackdrop"></div>' +
       '<aside class="mobile-nav-drawer" id="mobileDrawer">' +
-        NAV_LINKS.map(function (l) {
+        links.map(function (l) {
           return '<a href="' + l.href + '"' + (l.key === key ? ' class="active"' : '') + '>' + l.label + '</a>';
         }).join('') +
-        '<a href="/admin" id="drawerAdminLink">Admin Panel</a>' +
+        (authState.isAuthenticated
+          ? '<button class="mobile-logout-btn" id="mobileLogoutBtn">Sign Out</button>'
+          : '<button class="mobile-login-btn" id="mobileGoogleLogin">Login dengan Google</button>'
+        ) +
       '</aside>';
 
     var mount = document.getElementById('navbarMount');
@@ -303,53 +473,68 @@
       mount.innerHTML = html;
     }
 
-    // Login modal
-    var modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.id = 'loginModal';
-    modal.innerHTML =
-      '<div class="modal-box">' +
-        '<button class="modal-close-btn" id="modalCloseBtn" aria-label="Close">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
-        '</button>' +
-        '<h2 class="modal-title">Welcome Back</h2>' +
-        '<p class="modal-subtitle">Sign in to access the admin dashboard.</p>' +
-        '<form id="loginForm" novalidate>' +
-          '<div class="form-group">' +
-            '<label class="form-label" for="loginUsername">Username <span class="required">*</span></label>' +
-            '<input class="form-input" type="text" id="loginUsername" placeholder="Enter your username" autocomplete="username" required>' +
-            '<div class="form-error-msg" id="loginError"></div>' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label class="form-label" for="loginPassword">Password <span class="required">*</span></label>' +
-            '<input class="form-input" type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" required>' +
-          '</div>' +
-          '<button type="submit" class="btn btn-primary btn-block" id="loginSubmitBtn">Sign In</button>' +
-        '</form>' +
-      '</div>';
-    document.body.appendChild(modal);
-
     bindNavEvents();
   }
 
   function bindNavEvents() {
-    var btnLogin = document.getElementById('btnLogin');
-    var btnAdmin = document.getElementById('btnAdmin');
-    var modal = document.getElementById('loginModal');
-    var modalCloseBtn = document.getElementById('modalCloseBtn');
-    var loginForm = document.getElementById('loginForm');
+    var btnGoogleLogin = document.getElementById('btnGoogleLogin');
+    var btnLogout = document.getElementById('btnLogout');
+    var navProfile = document.getElementById('navProfile');
     var toggle = document.querySelector('.nav-mobile-toggle');
     var drawer = document.getElementById('mobileDrawer');
     var backdrop = document.getElementById('drawerBackdrop');
+    var mobileGoogleLogin = document.getElementById('mobileGoogleLogin');
+    var mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
 
-    if (btnLogin) btnLogin.addEventListener('click', function (e) { e.preventDefault(); openLoginModal(); });
-    if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeLoginModal);
-    if (modal) modal.addEventListener('click', function (e) { if (e.target === modal) closeLoginModal(); });
-    if (loginForm) loginForm.addEventListener('submit', handleLogin);
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && modal && modal.classList.contains('active')) closeLoginModal();
-    });
+    // Google Login button (desktop)
+    if (btnGoogleLogin) {
+      btnGoogleLogin.addEventListener('click', function () {
+        btnGoogleLogin.disabled = true;
+        btnGoogleLogin.innerHTML = '<span class="btn-spinner"></span> Signing in...';
+        googleSignIn().then(function (json) {
+          if (json.success) {
+            toast('Welcome, ' + json.data.user.displayName + '!', 'success');
+            // Rebuild navbar dengan state baru
+            updateAuthUI();
+          } else {
+            toast(json.message || 'Login failed.', 'error');
+            btnGoogleLogin.disabled = false;
+            btnGoogleLogin.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Login dengan Google';
+          }
+        }).catch(function (err) {
+          toast(err.message || 'Sign-in failed. Please try again.', 'error');
+          btnGoogleLogin.disabled = false;
+          btnGoogleLogin.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Login dengan Google';
+        });
+      });
+    }
 
+    // Logout button (desktop dropdown)
+    if (btnLogout) {
+      btnLogout.addEventListener('click', function () {
+        logout();
+        toast('You have been signed out.', 'info');
+      });
+    }
+
+    // Profile dropdown toggle (click to open/close)
+    if (navProfile) {
+      navProfile.addEventListener('click', function (e) {
+        // Jangan tutup dropdown jika klik item di dalamnya
+        if (e.target.closest('#btnLogout')) return;
+        var dd = document.getElementById('navProfileDropdown');
+        if (dd) dd.classList.toggle('open');
+      });
+      // Tutup dropdown jika klik di luar
+      document.addEventListener('click', function (e) {
+        if (!navProfile.contains(e.target)) {
+          var dd = document.getElementById('navProfileDropdown');
+          if (dd) dd.classList.remove('open');
+        }
+      });
+    }
+
+    // Mobile drawer
     if (toggle && drawer && backdrop) {
       toggle.addEventListener('click', function () {
         drawer.classList.add('open');
@@ -360,84 +545,95 @@
         backdrop.classList.remove('visible');
       });
     }
-  }
 
-  function openLoginModal() {
-    var modal = document.getElementById('loginModal');
-    if (!modal) return;
-    modal.classList.add('active');
-    var u = document.getElementById('loginUsername');
-    if (u) u.focus();
-    var err = document.getElementById('loginError');
-    if (err) { err.classList.remove('visible'); err.textContent = ''; }
-  }
-  function closeLoginModal() {
-    var modal = document.getElementById('loginModal');
-    if (!modal) return;
-    modal.classList.remove('active');
-    var form = document.getElementById('loginForm');
-    if (form) form.reset();
-  }
-
-  function handleLogin(e) {
-    e.preventDefault();
-    var u = document.getElementById('loginUsername').value.trim();
-    var p = document.getElementById('loginPassword').value;
-    var err = document.getElementById('loginError');
-    var btn = document.getElementById('loginSubmitBtn');
-    err.classList.remove('visible');
-
-    if (!u || !p) {
-      err.textContent = 'Please fill in all fields.';
-      err.classList.add('visible');
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Signing in...';
-
-    login(u, p).then(function (json) {
-      if (json.success) {
-        closeLoginModal();
-        updateAuthUI();
-        toast('Welcome back, ' + json.data.username + '!', 'success');
-        // Redirect to admin if currently on home or admin link clicked
-        setTimeout(function () {
-          if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
-            window.location.href = '/admin';
+    // Mobile Google Login
+    if (mobileGoogleLogin) {
+      mobileGoogleLogin.addEventListener('click', function () {
+        mobileGoogleLogin.disabled = true;
+        mobileGoogleLogin.textContent = 'Signing in...';
+        googleSignIn().then(function (json) {
+          if (json.success) {
+            toast('Welcome, ' + json.data.user.displayName + '!', 'success');
+            drawer.classList.remove('open');
+            backdrop.classList.remove('visible');
+            updateAuthUI();
+          } else {
+            toast(json.message || 'Login failed.', 'error');
+            mobileGoogleLogin.disabled = false;
+            mobileGoogleLogin.textContent = 'Login dengan Google';
           }
-        }, 500);
-      } else {
-        err.textContent = json.message || 'Login failed.';
-        err.classList.add('visible');
-      }
-    }).catch(function () {
-      err.textContent = 'Network error. Please try again.';
-      err.classList.add('visible');
-    }).finally(function () {
-      btn.disabled = false;
-      btn.textContent = 'Sign In';
-    });
+        }).catch(function () {
+          toast('Sign-in failed.', 'error');
+          mobileGoogleLogin.disabled = false;
+          mobileGoogleLogin.textContent = 'Login dengan Google';
+        });
+      });
+    }
+
+    // Mobile Logout
+    if (mobileLogoutBtn) {
+      mobileLogoutBtn.addEventListener('click', function () {
+        logout();
+        drawer.classList.remove('open');
+        backdrop.classList.remove('visible');
+        toast('You have been signed out.', 'info');
+      });
+    }
   }
 
+  /**
+   * updateAuthUI — Rebuild navbar berdasarkan auth state terkini.
+   * Dipanggil setelah login/logout/refresh.
+   */
   function updateAuthUI() {
-    var btnLogin = document.getElementById('btnLogin');
-    var btnAdmin = document.getElementById('btnAdmin');
-    var badge = document.getElementById('navUserBadge');
-    var usernameEl = document.getElementById('navUsername');
-    if (!btnLogin) return;
+    // Rebuild seluruh navbar agar state-aware
+    buildNavbar();
+  }
 
-    if (authState.isAuthenticated && authState.user) {
-      btnLogin.style.display = 'none';
-      btnAdmin.style.display = 'inline-flex';
-      if (badge) badge.classList.add('visible');
-      if (usernameEl) usernameEl.textContent = authState.user.username;
-    } else {
-      btnLogin.style.display = '';
-      btnAdmin.style.display = 'none';
-      if (badge) badge.classList.remove('visible');
-      if (usernameEl) usernameEl.textContent = '';
-    }
+  /**
+   * Firebase onAuthStateChanged listener.
+   * Menyinkronkan state Firebase dengan state lokal kita.
+   * Jika Firebase mengatakan user signed out (misal token revoke dari lain),
+   * clear token lokal dan update UI.
+   */
+  function setupFirebaseAuthListener() {
+    if (!initFirebase()) return;
+
+    _firebaseAuth.onAuthStateChanged(function (firebaseUser) {
+      if (!firebaseUser) {
+        // Firebase mengatakan user sudah sign out
+        if (authState.isAuthenticated) {
+          // Clear state lokal
+          removeToken();
+          authState.isAuthenticated = false;
+          authState.user = null;
+          updateAuthUI();
+          console.log('[Karina] Firebase onAuthStateChanged: signed out.');
+        }
+      } else {
+        // Firebase user masih signed in — jika kita belum punya token internal,
+        // coba refresh dari backend
+        if (!authState.isAuthenticated) {
+          // User signed in via Firebase tapi belum punya JWT internal
+          // (misalnya refresh halaman). Dapatkan idToken dan kirim ke backend.
+          firebaseUser.getIdToken().then(function (idToken) {
+            return api('/auth/google', {
+              method: 'POST',
+              body: JSON.stringify({ idToken: idToken })
+            });
+          }).then(function (json) {
+            if (json.success) {
+              setToken(json.data.token, json.data.user);
+              authState.isAuthenticated = true;
+              authState.user = json.data.user;
+              updateAuthUI();
+            }
+          }).catch(function () {
+            /* silent — user bisa jadi guest */
+          });
+        }
+      }
+    });
   }
 
   /* ---------- Footer injection ---------- */
@@ -448,21 +644,21 @@
           '<div class="footer-top">' +
             '<div class="footer-brand">' +
               '<div class="footer-logo">Karina-MD</div>' +
-              '<p class="footer-tagline">Premium multi-device WhatsApp bot platform. Scripts, snippets, and updates in one place.</p>' +
+              '<p class="footer-tagline">Global Open-Source Platform & Project Hub. Scripts, snippets, and community contributions in one place.</p>' +
             '</div>' +
             '<div class="footer-links">' +
               '<div class="footer-col"><h5>Explore</h5>' +
-                '<a href="/scripts">Scripts</a>' +
+                '<a href="/scripts">Projects</a>' +
                 '<a href="/snippets">Snippets</a>' +
                 '<a href="/downloads">Downloads</a>' +
                 '<a href="/updates">Updates</a>' +
               '</div>' +
-              '<div class="footer-col"><h5>Support</h5>' +
-                '<a href="/support">Submit Ticket</a>' +
+              '<div class="footer-col"><h5>Community</h5>' +
+                '<a href="/support">Support Ticket</a>' +
                 '<a href="https://whatsapp.com/channel/0029Vb816qs6LwHheK1KT044" target="_blank" rel="noopener">WhatsApp Channel</a>' +
                 '<a href="https://wa.me/6283815201912" target="_blank" rel="noopener">Contact</a>' +
               '</div>' +
-              '<div class="footer-col"><h5>Admin</h5>' +
+              '<div class="footer-col"><h5>Platform</h5>' +
                 '<a href="/admin">Admin Panel</a>' +
               '</div>' +
             '</div>' +
@@ -490,17 +686,17 @@
     auth: {
       state: authState,
       refresh: refreshAuthState,
-      login: login,
+      googleSignIn: googleSignIn,
       logout: logout,
-      isAdmin: function () { return authState.isAuthenticated && authState.user; },
+      isAdmin: function () { return authState.isAuthenticated && authState.user && authState.user.role === 'admin'; },
+      isLoggedIn: function () { return authState.isAuthenticated; },
       getCachedUser: getCachedUser
     },
     ui: {
       toast: toast,
       buildNavbar: buildNavbar,
       buildFooter: buildFooter,
-      updateAuthUI: updateAuthUI,
-      openLoginModal: openLoginModal
+      updateAuthUI: updateAuthUI
     },
     util: {
       escapeHTML: escapeHTML,
@@ -518,7 +714,11 @@
   document.addEventListener('DOMContentLoaded', function () {
     buildNavbar();
     buildFooter();
-    // Check auth state if token exists
+
+    // Setup Firebase auth listener untuk sinkronisasi state
+    setupFirebaseAuthListener();
+
+    // Check auth state jika token internal tersedia
     if (getToken()) {
       refreshAuthState().then(function () {
         updateAuthUI();

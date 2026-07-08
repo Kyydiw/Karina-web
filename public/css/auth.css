@@ -1,0 +1,260 @@
+/* ============================================================
+   Karina-MD Platform — Navbar Auth Components
+   Styles for: Google login button, profile avatar, dropdown menu,
+   role badge, mobile login/logout buttons.
+   
+   Include this AFTER style.css and shared.css.
+   ============================================================ */
+
+/* ===== Google Login Button ===== */
+.btn-google-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-soft);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-charcoal);
+  background: var(--bg-white);
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+.btn-google-login:hover {
+  border-color: var(--accent-teal);
+  color: var(--accent-teal-dark);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+.btn-google-login:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.btn-google-login svg {
+  flex-shrink: 0;
+}
+
+/* ===== Profile Avatar & Dropdown ===== */
+.nav-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 10px 4px 4px;
+  border-radius: var(--radius-pill);
+  transition: background 0.2s ease;
+  position: relative;
+}
+.nav-profile:hover {
+  background: var(--bg-neutral);
+}
+
+/* Avatar image */
+.nav-avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent-teal-light);
+  flex-shrink: 0;
+}
+
+/* Avatar initial (fallback when no photo) */
+.nav-avatar-initial {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-teal), var(--accent-teal-dark));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Profile name */
+.nav-profile-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-charcoal);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Admin role badge */
+.nav-role-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--accent-teal), var(--accent-teal-dark));
+  color: #fff;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+/* ===== Profile Dropdown Menu ===== */
+.nav-profile-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 260px;
+  background: var(--bg-white);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 40px rgba(44, 62, 80, 0.15);
+  z-index: 1100;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.2s ease;
+}
+.nav-profile-dropdown.open {
+  display: block;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text-charcoal);
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.nav-dropdown-item:hover {
+  background: var(--bg-neutral);
+}
+
+/* User info section in dropdown */
+.nav-dropdown-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: default;
+  background: var(--bg-neutral);
+}
+.nav-dropdown-info:hover {
+  background: var(--bg-neutral);
+}
+.nav-dropdown-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.nav-dropdown-info strong {
+  display: block;
+  font-size: 14px;
+  color: var(--text-charcoal);
+  line-height: 1.3;
+}
+.nav-dropdown-info small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+/* Logout button in dropdown */
+#btnLogout {
+  color: #e74c3c;
+  border-top: 1px solid var(--border-soft);
+  border-radius: 0;
+}
+#btnLogout:hover {
+  background: #fdf2f2;
+}
+
+/* ===== Mobile Nav Drawer Additions ===== */
+.mobile-nav-drawer {
+  /* inherits from existing style.css */
+}
+.mobile-login-btn,
+.mobile-logout-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border-top: 1px solid var(--border-soft);
+  margin-top: 8px;
+  transition: background 0.15s ease;
+}
+.mobile-login-btn {
+  color: var(--accent-teal-dark);
+}
+.mobile-login-btn:hover {
+  background: var(--bg-neutral);
+}
+.mobile-logout-btn {
+  color: #e74c3c;
+}
+.mobile-logout-btn:hover {
+  background: #fdf2f2;
+}
+
+/* ===== Button Spinner ===== */
+.btn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: btnSpin 0.6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Code Textarea (for snippet submit form) ===== */
+.code-textarea {
+  tab-size: 2;
+  -moz-tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+/* ===== Responsive: Hide profile name on small screens ===== */
+@media (max-width: 768px) {
+  .nav-profile-name {
+    display: none;
+  }
+  .nav-role-badge {
+    display: none;
+  }
+  .nav-profile {
+    padding: 4px;
+  }
+  .btn-google-login span {
+    display: none;
+  }
+  .btn-google-login {
+    padding: 8px 10px;
+  }
+}

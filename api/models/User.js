@@ -2,20 +2,49 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * User Model — Firebase Auth Integration
+ *
+ * Skema ini mendukung autentikasi via Google Sign-In (Firebase).
+ * Field utama: email, displayName, photoURL, firebaseUid, role.
+ *
+ * Migrasi catatan:
+ * - Skema lama (username + password bcrypt) dihapus.
+ * - Registrasi sekarang hanya melalui Firebase Auth (frontend Google Sign-In).
+ * - Role admin ditetapkan manual (lihat authController.googleLogin).
+ */
 const userSchema = new mongoose.Schema(
   {
-    username: {
+    email: {
       type: String,
-      required: [true, 'Username is required'],
+      required: [true, 'Email is required'],
       unique: true,
       trim: true,
-      minlength: [3, 'Username must be at least 3 characters'],
-      maxlength: [30, 'Username must be at most 30 characters']
+      lowercase: true,
+      maxlength: [254, 'Email must be at most 254 characters']
     },
-    password: {
+    displayName: {
       type: String,
-      required: [true, 'Password is required'],
-      minlength: [6, 'Password must be at least 6 characters']
+      required: [true, 'Display name is required'],
+      trim: true,
+      maxlength: [60, 'Display name must be at most 60 characters']
+    },
+    photoURL: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    firebaseUid: {
+      type: String,
+      required: [true, 'Firebase UID is required'],
+      unique: true,
+      trim: true,
+      index: true
+    },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user'
     }
   },
   {

@@ -2,6 +2,16 @@
 
 const mongoose = require('mongoose');
 
+/**
+ * Snippet Model — Community Submission Support
+ *
+ * Perubahan dari skema lama:
+ * - Ditambahkan field `status` dengan enum ['pending', 'approved'].
+ * - Ditambahkan field `submittedBy` (referensi ke User) untuk tracking
+ *   siapa yang mengirimkan snippet (null jika dibuat oleh admin langsung).
+ * - `isPublished` tetap ada untuk backward compatibility; snippet yang
+ *   status='approved' otomatis dianggap published oleh query layer.
+ */
 const snippetSchema = new mongoose.Schema(
   {
     title: {
@@ -68,6 +78,17 @@ const snippetSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
       index: true
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved'],
+      default: 'approved',
+      index: true
+    },
+    submittedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     }
   },
   {
@@ -79,5 +100,6 @@ const snippetSchema = new mongoose.Schema(
 snippetSchema.index({ createdAt: -1 });
 snippetSchema.index({ title: 'text', description: 'text', tags: 'text' });
 snippetSchema.index({ language: 1, createdAt: -1 });
+snippetSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.models.Snippet || mongoose.model('Snippet', snippetSchema);
